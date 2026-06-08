@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "packageManager": "bun",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/web/ui.html dist/web/ui.html",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "deploy": "bunx hugo && wrangler deploy",

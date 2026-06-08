@@ -67,11 +67,19 @@ export interface TwitterConfig {
   totpSecret?: string;
 }
 
+export interface WebUIConfig {
+  enabled: boolean;
+  port: number;
+  host: string;
+  password?: string;
+}
+
 export interface AppConfig {
   users: UserConfig[];
   discord: DiscordConfig;
   telegram: TelegramConfig;
   twitter: TwitterConfig;
+  webui: WebUIConfig;
   enableApproval: boolean;
   sendAsImage: boolean;
   xToImageApiUrl?: string;

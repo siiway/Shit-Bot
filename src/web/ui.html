@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ShitBot</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap');
+
+  :root {
+    --bg: #f9f7f4;
+    --bg-card: #fff;
+    --bg-sidebar: #f3f0eb;
+    --bg-input: #f5f2ee;
+    --bg-hover: #faf9f7;
+    --border: #e8e3db;
+    --border-active: #c4b8a8;
+    --text: #3d3630;
+    --text-dim: #9b9085;
+    --text-bright: #1e1915;
+    --accent: #d4785c;
+    --accent-soft: #fdf0ea;
+    --green: #5b9a6b;
+    --green-soft: #edf7ef;
+    --red: #c25b5b;
+    --red-soft: #fdf0f0;
+    --amber: #c4943a;
+    --amber-soft: #fdf7ed;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);
+    --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #14110e;
+    --bg-card: #1e1b18;
+    --bg-sidebar: #1a1714;
+    --bg-input: #24211d;
+    --bg-hover: #23201c;
+    --border: #302c27;
+    --border-active: #5c5246;
+    --text: #c9c1b7;
+    --text-dim: #7a7267;
+    --text-bright: #ece5df;
+    --accent: #e09070;
+    --accent-soft: #2a1e18;
+    --green: #6aaf7c;
+    --green-soft: #1a241e;
+    --red: #d07070;
+    --red-soft: #2a1c1c;
+    --amber: #d4a84a;
+    --amber-soft: #2a241a;
+    --shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 1040px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ── Header ────────────────────── */
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 28px 0 20px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .theme-toggle {
+    min-width: 36px; height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all var(--transition);
+    font-family: var(--font-body);
+    white-space: nowrap;
+  }
+
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  .logo { display: flex; align-items: center; gap: 12px; }
+
+  .logo-mark {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, #e8a085, #d4785c);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; color: #fff;
+    box-shadow: 0 2px 8px rgba(212,120,92,0.25);
+  }
+
+  .logo h1 {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 600; color: var(--text-bright);
+    letter-spacing: -0.3px;
+  }
+
+  .logo span {
+    font-size: 12px; color: var(--text-dim);
+    display: block; margin-top: -2px;
+  }
+
+  .header-status {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: var(--green-soft);
+    border-radius: 20px;
+    font-size: 12px; font-weight: 500; color: var(--green);
+  }
+
+  .header-status::before {
+    content: ''; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  /* ── Stats ─────────────────────── */
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 30px; font-weight: 600;
+    color: var(--text-bright);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 12px; color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* ── Layout ────────────────────── */
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 172px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* ── Sidebar ───────────────────── */
+
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-radius: var(--radius);
+    padding: 8px;
+    position: sticky; top: 24px;
+  }
+
+  .sidebar-label {
+    font-size: 10px; font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 10px 6px;
+    margin-bottom: 2px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none; background: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: var(--font-body); font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .nav-item:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+
+  .nav-item.active {
+    color: var(--text-bright);
+    background: var(--bg-card);
+    box-shadow: var(--shadow);
+    font-weight: 600;
+  }
+
+  .nav-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%; background: var(--border);
+    transition: all var(--transition);
+  }
+
+  .nav-item.active .nav-dot { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+  .nav-item .nav-badge {
+    margin-left: auto;
+    font-size: 10px; font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+
+  /* ── Panel ─────────────────────── */
+
+  .panel {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600; color: var(--text-bright);
+  }
+
+  .panel-head-icon { font-size: 15px; }
+
+  .panel-body { padding: 24px; }
+
+  .tab-content { display: none; animation: fade 0.25s ease; }
+  .tab-content.active { display: block; }
+
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+  /* ── Forms ─────────────────────── */
+
+  .field { margin-bottom: 18px; }
+
+  .field label {
+    display: block; font-size: 12px; font-weight: 500;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+
+  .field input, .field select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-bright);
+    font-family: var(--font-body); font-size: 13px;
+    outline: none;
+    transition: all var(--transition);
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    background: var(--bg-card);
+  }
+
+  .field input::placeholder { color: var(--text-dim); }
+
+  .field select {
+    -webkit-appearance: none;
+    background: var(--bg-input) url("data:image/svg+xml,%3Csvg width='12' height='8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%239b9085' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  }
+
+  .field select:focus { background-color: var(--bg-card); }
+
+  .field-inline { display: flex; align-items: center; gap: 10px; }
+  .field-inline label { margin-bottom: 0; font-size: 13px; color: var(--text); cursor: pointer; }
+
+  .field input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  .field-hint {
+    font-size: 11px; color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* ── Chips ─────────────────────── */
+
+  .chip-array {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    min-height: 38px; align-items: flex-start;
+    transition: border-color var(--transition);
+  }
+
+  .chip-array:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px; color: var(--text);
+    font-weight: 500;
+  }
+
+  .chip .rm {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: none; border: none;
+    color: var(--text-dim);
+    cursor: pointer; font-size: 14px; line-height: 1;
+    transition: all var(--transition);
+  }
+
+  .chip .rm:hover { background: var(--red-soft); color: var(--red); }
+
+  .chip-array input {
+    border: none; background: none; outline: none;
+    color: var(--text); font-family: var(--font-body); font-size: 12px;
+    min-width: 90px; flex: 1;
+  }
+
+  .chip-array input::placeholder { color: var(--text-dim); }
+
+  /* ── Buttons ───────────────────── */
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text);
+    font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .btn:hover { background: var(--bg-hover); border-color: var(--border-active); }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .btn-primary:hover {
+    background: #c56a4e;
+    box-shadow: 0 2px 12px rgba(212,120,92,0.3);
+  }
+
+  .btn-danger {
+    background: var(--bg-card);
+    border-color: var(--border);
+    color: var(--red);
+  }
+
+  .btn-danger:hover { background: var(--red-soft); border-color: var(--red); }
+
+  .btn-ghost {
+    background: none; border: none; color: var(--text-dim);
+    padding: 6px 10px; font-size: 12px;
+  }
+
+  .btn-ghost:hover { color: var(--text); background: var(--bg-hover); }
+
+  .btn-sm { padding: 5px 14px; font-size: 12px; }
+  .btn-xs { padding: 3px 10px; font-size: 11px; border-radius: 6px; }
+
+  .btn-group { display: flex; gap: 8px; margin-top: 18px; }
+
+  /* ── Users ─────────────────────── */
+
+  .add-bar {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 12px; align-items: end;
+    padding: 18px;
+    background: var(--bg-sidebar);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+  }
+
+  .add-bar .field { margin-bottom: 0; }
+
+  .user-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .user-card {
+    background: var(--bg-sidebar);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    border: 1px solid transparent;
+    transition: all var(--transition);
+  }
+
+  .user-card:hover { border-color: var(--border); background: var(--bg-card); box-shadow: var(--shadow); }
+
+  .user-card-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .user-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e8c8b8, #d4a590);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; color: #fff;
+    margin-right: 12px; flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .user-avatar img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+
+  .user-info { display: flex; align-items: center; }
+
+  .user-name { font-weight: 600; color: var(--text-bright); font-size: 14px; }
+  .user-handle { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
+
+  .user-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 48px; margin-top: 2px; }
+
+  .ftag {
+    font-size: 11px; font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--bg-card);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  .ftag.on { color: var(--green); background: var(--green-soft); border-color: transparent; }
+  .ftag.off { color: var(--red); background: var(--red-soft); border-color: transparent; }
+
+  .user-filters-box {
+    margin-top: 12px; margin-left: 48px;
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Cards ─────────────────────── */
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--bg-sidebar);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 12px; font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Empty State ───────────────── */
+
+  .empty {
+    text-align: center; padding: 56px 20px; color: var(--text-dim);
+  }
+
+  .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.5; }
+
+  .empty p { font-size: 13px; }
+
+  /* ── Table ─────────────────────── */
+
+  .data-table { width: 100%; border-collapse: collapse; }
+
+  .data-table th {
+    text-align: left; padding: 10px 14px;
+    font-size: 11px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--text);
+  }
+
+  .data-table tr:hover td { background: var(--bg-sidebar); }
+
+  .col-content { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Toast ─────────────────────── */
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100;
+    padding: 12px 20px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-md);
+    font-size: 13px; font-weight: 500; color: var(--text);
+    border-left: 3px solid var(--accent);
+    animation: toastIn 0.25s ease;
+  }
+
+  .toast.error { border-left-color: var(--red); color: var(--red); }
+
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } }
+
+  /* ── Toggle switch ─────────────── */
+
+  .toggle {
+    position: relative; display: inline-block;
+    width: 40px; height: 22px;
+  }
+
+  .toggle input { opacity: 0; width: 0; height: 0; }
+
+  .toggle-slider {
+    position: absolute; cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 22px;
+    transition: var(--transition);
+  }
+
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 2px; top: 2px;
+    background: #fff;
+    border-radius: 50%;
+    transition: var(--transition);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  /* ── Responsive ────────────────── */
+
+  @media (max-width: 720px) {
+    .main-layout { grid-template-columns: 1fr; }
+    .sidebar {
+      position: static;
+      display: flex; flex-wrap: wrap;
+      gap: 4px; padding: 6px;
+    }
+    .sidebar-label { width: 100%; }
+    .nav-item { flex: 1; min-width: fit-content; font-size: 11px; padding: 8px 10px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .add-bar { grid-template-columns: 1fr; }
+    .field-row, .field-row-3 { grid-template-columns: 1fr; }
+    .cards-grid { grid-template-columns: 1fr; }
+    .user-tags { margin-left: 0; }
+    .user-filters-box { margin-left: 0; }
+    .col-content { max-width: 140px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-mark">◇</div>
+      <div>
+        <h1>ShitBot</h1>
+        <span>Twitter Monitor</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" id="lang-toggle" title="Switch language">EN</button>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle theme">☀️</button>
+      <div class="header-status">Running</div>
+    </div>
+  </header>
+
+  <div class="stats-row" id="stats"></div>
+
+  <div class="main-layout">
+    <nav class="sidebar">
+      <div class="sidebar-label">Menu</div>
+      <button class="nav-item active" data-tab="users"><span class="nav-dot"></span>Users<span class="nav-badge" id="nav-user-count"></span></button>
+      <button class="nav-item" data-tab="discord"><span class="nav-dot"></span>Discord</button>
+      <button class="nav-item" data-tab="telegram"><span class="nav-dot"></span>Telegram</button>
+      <button class="nav-item" data-tab="twitter"><span class="nav-dot"></span>Twitter/X</button>
+      <button class="nav-item" data-tab="settings"><span class="nav-dot"></span>Settings</button>
+      <button class="nav-item" data-tab="logs"><span class="nav-dot"></span>Log</button>
+    </nav>
+
+    <main class="panel">
+      <div class="panel-head">
+        <span class="panel-head-icon" id="panel-icon">👥</span>
+        <span id="panel-label">Users</span>
+      </div>
+      <div class="panel-body">
+        <div id="tab-users" class="tab-content active"></div>
+        <div id="tab-discord" class="tab-content"></div>
+        <div id="tab-telegram" class="tab-content"></div>
+        <div id="tab-twitter" class="tab-content"></div>
+        <div id="tab-settings" class="tab-content"></div>
+        <div id="tab-logs" class="tab-content"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:100;"></div>
+
+<script>
+let config = null;
+let lang = 'en';
+
+const messages = {
+  en: {
+    menu: 'Menu', users: 'Users', discord: 'Discord', telegram: 'Telegram', twitter: 'Twitter/X', settings: 'Settings', log: 'Log',
+    running: 'Running', twitterMonitor: 'Twitter Monitor', toggleTheme: 'Toggle theme',
+    monitored: 'Monitored', interval: 'Interval', on: 'On', off: 'Off', minUnit: ' min',
+    username: 'Username', displayName: 'Display name', addUser: 'Add User',
+    noUsers: 'No users yet. Add one above.', remove: 'Remove', editFilters: 'Edit filters', save: 'Save',
+    includeKw: 'Include keywords', excludeKw: 'Exclude keywords', addKw: 'Add keyword...',
+    mediaOnly: 'Media only', skipRT: 'Skip retweets', skipReplies: 'Skip replies',
+    anyPost: 'Any post', withRT: 'With RT', noRT: 'No RT', withReplies: 'With replies', noReplies: 'No replies',
+    updatedUser: 'Updated @', addedUser: 'Added @', removedUser: 'Removed @',
+    usernameRequired: 'Username required', configSaved: 'Saved', saveFailed: 'Save failed: ',
+    loadFailed: 'Failed to load config: ', confirmRemove: 'Remove @', confirmRemoveSuffix: '?',
+    enable: 'Enable', botToken: 'Bot Token', channelId: 'Channel ID', adminChannelId: 'Admin Channel ID',
+    r14ChannelId: 'R14 Channel ID', approveRoleId: 'Approval Role ID', embedColor: 'Embed Color',
+    chatId: 'Chat ID', parseMode: 'Parse mode', apiRoot: 'API Root', adminChatIds: 'Admin Chat IDs',
+    authToken: 'Auth Token', ct0: 'CT0', pwd: 'Password', email: 'Email', totpSecret: 'TOTP Secret',
+    approvalMode: 'Approval mode', sendAsImage: 'Send as image', pollInterval: 'Poll interval (min)',
+    maxPosts: 'Max posts per fetch', maxTweetAge: 'Max tweet age (min)', imgCacheTtl: 'Image cache TTL (min)',
+    apiUrl: 'API URL', apiToken: 'API Token', theme: 'Theme', port: 'Port', host: 'Host', password: 'Password',
+    hintNewToken: 'Enter a new token to change', hintKeep: 'Leave empty to keep current',
+    hintCookie: 'Cookie-based auth (recommended)', hintPwdLogin: 'Password login', hintVerify: 'Verification email',
+    hint2fa: 'Base32 2FA key', hintApproval: 'Require admin approval before posting',
+    hintNoAuth: 'No password = open access', hintEnterAdd: 'Press Enter to add',
+    hintProxy: 'Proxy URL (optional)', phHandle: '@elonmusk', phName: 'Elon Musk', phColor: '#1DA1F2',
+    phAddId: 'Add ID...', btnSaveD: 'Save Discord', btnSaveT: 'Save Telegram', btnSaveTw: 'Save Twitter/X',
+    btnSaveS: 'Save Settings', btnSaveG: 'Save General', btnSaveImg: 'Save X to Image', btnSaveW: 'Save Web UI',
+    general: 'General', xToImg: 'X to Image', webUi: 'Web UI',
+    loading: 'Loading...', noTweets: 'No tweets forwarded yet.', thAuthor: 'Author', thContent: 'Content',
+    thSent: 'Sent', logError: 'Error: ', unauthPrompt: 'Enter WebUI password:',
+    langBtn: '中文',
+  },
+  'zh-CN': {
+    menu: '菜单', users: '用户', discord: 'Discord', telegram: 'Telegram', twitter: 'Twitter/X', settings: '设置', log: '日志',
+    running: '运行中', twitterMonitor: 'Twitter 监控', toggleTheme: '切换主题',
+    monitored: '监控数', interval: '轮询间隔', on: '开', off: '关', minUnit: ' 分钟',
+    username: '用户名', displayName: '显示名称', addUser: '添加用户',
+    noUsers: '暂无用户，请在上方添加。', remove: '删除', editFilters: '编辑过滤', save: '保存',
+    includeKw: '包含关键词', excludeKw: '排除关键词', addKw: '添加关键词...',
+    mediaOnly: '仅媒体', skipRT: '跳过转推', skipReplies: '跳过回复',
+    anyPost: '所有帖子', withRT: '含转推', noRT: '无转推', withReplies: '含回复', noReplies: '无回复',
+    updatedUser: '已更新 @', addedUser: '已添加 @', removedUser: '已删除 @',
+    usernameRequired: '请输入用户名', configSaved: '已保存', saveFailed: '保存失败: ',
+    loadFailed: '加载配置失败: ', confirmRemove: '确认删除 @', confirmRemoveSuffix: '？',
+    enable: '启用', botToken: 'Bot 令牌', channelId: '频道 ID', adminChannelId: '管理频道 ID',
+    r14ChannelId: 'R14 频道 ID', approveRoleId: '审批角色 ID', embedColor: '嵌入颜色',
+    chatId: '聊天 ID', parseMode: '解析模式', apiRoot: 'API 代理', adminChatIds: '管理员 Chat ID',
+    authToken: 'Auth Token', ct0: 'CT0', pwd: '密码', email: '邮箱', totpSecret: 'TOTP 密钥',
+    approvalMode: '审批模式', sendAsImage: '以图片发送', pollInterval: '轮询间隔 (分钟)',
+    maxPosts: '每次最大获取', maxTweetAge: '推文最大年龄 (分钟)', imgCacheTtl: '图片缓存时长 (分钟)',
+    apiUrl: 'API 地址', apiToken: 'API 令牌', theme: '主题', port: '端口', host: '主机', password: '密码',
+    hintNewToken: '输入新令牌以更改', hintKeep: '留空保留当前值',
+    hintCookie: 'Cookie 认证 (推荐)', hintPwdLogin: '密码登录', hintVerify: '验证邮箱',
+    hint2fa: 'Base32 两步验证密钥', hintApproval: '启用后需管理员审批才能推送',
+    hintNoAuth: '留空则无需密码访问', hintEnterAdd: '按回车添加',
+    hintProxy: '代理地址 (可选)', phHandle: '@用户名', phName: '显示名称', phColor: '#1DA1F2',
+    phAddId: '输入 ID...', btnSaveD: '保存 Discord', btnSaveT: '保存 Telegram', btnSaveTw: '保存 Twitter/X',
+    btnSaveS: '保存设置', btnSaveG: '保存常规', btnSaveImg: '保存 X to Image', btnSaveW: '保存 Web UI',
+    general: '常规', xToImg: 'X to Image', webUi: 'Web UI',
+    loading: '加载中...', noTweets: '暂无已推送推文。', thAuthor: '作者', thContent: '内容',
+    thSent: '推送时间', logError: '错误: ', unauthPrompt: '请输入 WebUI 密码:',
+    langBtn: 'English',
+  }
+};
+
+function t(key, ...args) {
+  let msg = (messages[lang] && messages[lang][key]) || (messages.en[key] || key);
+  for (let i = 0; i < args.length; i++) msg = msg.replace('%' + (i + 1), args[i]);
+  return msg;
+}
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const resp = await fetch(path, opts);
+  if (resp.status === 401) {
+    const pw = prompt(t('unauthPrompt'));
+    if (!pw) throw new Error('Unauthorized');
+    opts.headers = { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + btoa(':' + pw) };
+    if (body) opts.body = JSON.stringify(body);
+    const retry = await fetch(path, opts);
+    return retry.json();
+  }
+  return resp.json();
+}
+
+function toast(msg, type) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type === 'error' ? ' error' : '');
+  el.textContent = msg;
+  $('#toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+async function loadConfig() {
+  try { config = await api('/api/config'); render(); }
+  catch(e) { toast(t('loadFailed') + e.message, 'error'); }
+}
+
+async function saveFullConfig(patch) {
+  try {
+    await api('/api/config', 'PUT', patch);
+    toast(t('configSaved'));
+    await loadConfig();
+  } catch(e) { toast(t('saveFailed') + e.message, 'error'); }
+}
+
+/* ── Helpers ────────────────────── */
+
+function fldHTML(label, key, val, opts = {}) {
+  const { type = 'text', placeholder = '', isSecret = false, hint = '' } = opts;
+  const id = 'fld_' + key.replace(/\./g, '_');
+  const displayVal = isSecret && val === '••••••••' ? '' : (val || '');
+  const inputType = isSecret ? 'password' : type;
+
+  let h = '<div class="field"><label>' + label + '</label>';
+  if (type === 'checkbox') {
+    h += '<div class="field-inline">';
+    h += '<input type="checkbox" id="' + id + '" ' + (val ? 'checked' : '') + '>';
+    h += '<label for="' + id + '">' + (placeholder || 'Enabled') + '</label>';
+    h += '</div>';
+  } else if (type === 'select') {
+    h += '<select id="' + id + '">';
+    for (const o of (opts.options || []))
+      h += '<option value="' + o + '"' + (val === o ? ' selected' : '') + '>' + o + '</option>';
+    h += '</select>';
+  } else {
+    h += '<input type="' + inputType + '" id="' + id + '" value="' + displayVal + '" placeholder="' + placeholder + '">';
+  }
+  if (hint) h += '<div class="field-hint">' + hint + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function getFld(key) {
+  const el = document.getElementById('fld_' + key.replace(/\./g, '_'));
+  if (!el) return undefined;
+  if (el.type === 'checkbox') return el.checked;
+  return el.value;
+}
+
+function chipHTML(text) {
+  return '<span class="chip">' + text + '<span class="rm" onclick="this.parentElement.remove()">×</span></span>';
+}
+
+function addChip(e, input, containerId) {
+  if (e.key === 'Enter' && input.value.trim()) {
+    e.preventDefault();
+    const c = document.getElementById(containerId);
+    const span = document.createElement('span');
+    span.className = 'chip';
+    span.innerHTML = input.value.trim() + '<span class="rm" onclick="this.parentElement.remove()">×</span>';
+    c.insertBefore(span, input);
+    input.value = '';
+  }
+}
+
+function getChips(id) {
+  const c = document.getElementById(id);
+  if (!c) return [];
+  return Array.from(c.querySelectorAll('.chip')).map(ch => ch.childNodes[0].textContent.trim()).filter(Boolean);
+}
+
+/* ── Stats ──────────────────────── */
+
+function renderStats() {
+  const u = config.users.length;
+  const d = config.discord.enabled ? t('on') : t('off');
+  const tg = config.telegram.enabled ? t('on') : t('off');
+  const p = config.pollIntervalMinutes + t('minUnit');
+  $('#stats').innerHTML =
+    '<div class="stat"><div class="stat-value">' + u + '</div><div class="stat-label">' + t('monitored') + '</div></div>' +
+    '<div class="stat"><div class="stat-value">' + d + '</div><div class="stat-label">Discord</div></div>' +
+    '<div class="stat"><div class="stat-value">' + tg + '</div><div class="stat-label">Telegram</div></div>' +
+    '<div class="stat"><div class="stat-value">' + p + '</div><div class="stat-label">' + t('interval') + '</div></div>';
+  const badge = document.getElementById('nav-user-count');
+  if (badge) badge.textContent = u;
+}
+
+/* ── Users ──────────────────────── */
+
+function avatarHTML(username, displayName) {
+  const name = displayName || username || '?';
+  const ch = name[0].toUpperCase();
+  return '<div class="user-avatar">' +
+    '<img src="https://unavatar.io/twitter/' + username + '" alt=""' +
+    ' onerror="this.style.display=\'none\';this.parentElement.textContent=\'' + ch + '\'"' +
+    ' loading="lazy">' +
+    '</div>';
+}
+
+function buildFilterForm(u, i) {
+  const incs = ((u.filters || {}).keywords || {}).include || [];
+  const excs = ((u.filters || {}).keywords || {}).exclude || [];
+  const med = (u.filters || {}).media || {};
+
+  let h = '<div class="field-row">';
+  h += '<div class="field"><label>' + t('includeKw') + '</label><div class="chip-array" id="arr_inc_' + i + '">';
+  incs.forEach(k => h += chipHTML(k));
+  h += '<input onkeydown="addChip(event, this, \'arr_inc_' + i + '\')" placeholder="' + t('addKw') + '"></div></div>';
+  h += '<div class="field"><label>' + t('excludeKw') + '</label><div class="chip-array" id="arr_exc_' + i + '">';
+  excs.forEach(k => h += chipHTML(k));
+  h += '<input onkeydown="addChip(event, this, \'arr_exc_' + i + '\')" placeholder="' + t('addKw') + '"></div></div>';
+  h += '</div>';
+  h += '<div class="field-row-3" style="margin-top:8px">';
+  h += '<div class="field field-inline"><input type="checkbox" id="fmed_' + i + '" ' + (med.requireMedia ? 'checked' : '') + '><label>' + t('mediaOnly') + '</label></div>';
+  h += '<div class="field field-inline"><input type="checkbox" id="frt_' + i + '" ' + ((u.filters || {}).excludeRetweets ? 'checked' : '') + '><label>' + t('skipRT') + '</label></div>';
+  h += '<div class="field field-inline"><input type="checkbox" id="freply_' + i + '" ' + ((u.filters || {}).excludeReplies ? 'checked' : '') + '><label>' + t('skipReplies') + '</label></div>';
+  h += '</div>';
+  return h;
+}
+
+async function saveUserFilters(username, i) {
+  const filters = {
+    keywords: { include: getChips('arr_inc_' + i), exclude: getChips('arr_exc_' + i) },
+    media: { requireMedia: !!document.getElementById('fmed_' + i)?.checked },
+    excludeRetweets: !!document.getElementById('frt_' + i)?.checked,
+    excludeReplies: !!document.getElementById('freply_' + i)?.checked,
+  };
+  await api('/api/users/' + username, 'PUT', { filters });
+  toast(t('updatedUser') + username);
+  await loadConfig();
+}
+
+function toggleFilters(uname) {
+  const idx = config.users.indexOf(config.users.find(x => x.username === uname));
+  const el = document.getElementById('filters-' + idx);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addUser() {
+  const uname = $('#new-username').value.trim();
+  const display = $('#new-display').value.trim();
+  if (!uname) { toast(t('usernameRequired'), 'error'); return; }
+  try {
+    await api('/api/users', 'POST', { username: uname, displayName: display || uname });
+    toast(t('addedUser') + uname);
+    await loadConfig();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function removeUser(username) {
+  if (!confirm(t('confirmRemove') + username + t('confirmRemoveSuffix'))) return;
+  await api('/api/users/' + username, 'DELETE');
+  toast(t('removedUser') + username);
+  await loadConfig();
+}
+
+function renderUsers() {
+  let h = '<div class="add-bar">';
+  h += '<div class="field"><label>' + t('username') + '</label><input id="new-username" placeholder="' + t('phHandle') + '"></div>';
+  h += '<div class="field"><label>' + t('displayName') + '</label><input id="new-display" placeholder="' + t('phName') + '"></div>';
+  h += '<button class="btn btn-primary" onclick="addUser()" style="height:42px">' + t('addUser') + '</button>';
+  h += '</div>';
+
+  if (!config.users.length) {
+    h += '<div class="empty"><div class="empty-icon">👤</div><p>' + t('noUsers') + '</p></div>';
+  } else {
+    h += '<div class="user-list">';
+    config.users.forEach((u, i) => {
+      const f = u.filters || {}, kw = f.keywords || {}, med = f.media || {};
+      h += '<div class="user-card">';
+      h += '<div class="user-card-top">';
+      h += '<div class="user-info">' + avatarHTML(u.username, u.displayName);
+      h += '<span class="user-name">' + (u.displayName || u.username) + '</span>';
+      h += '<span class="user-handle">@' + u.username + '</span></div>';
+      h += '<button class="btn btn-danger btn-xs" onclick="removeUser(\'' + u.username + '\')">' + t('remove') + '</button>';
+      h += '</div>';
+      h += '<div class="user-tags">';
+      if (kw.include && kw.include.length) h += '<span class="ftag on">+ ' + kw.include.join(', ') + '</span>';
+      if (kw.exclude && kw.exclude.length) h += '<span class="ftag">− ' + kw.exclude.join(', ') + '</span>';
+      h += '<span class="ftag ' + (med.requireMedia ? 'on' : '') + '">' + (med.requireMedia ? t('mediaOnly') : t('anyPost')) + '</span>';
+      h += '<span class="ftag ' + (f.excludeRetweets ? 'on' : '') + '">' + (f.excludeRetweets ? t('noRT') : t('withRT')) + '</span>';
+      h += '<span class="ftag ' + (f.excludeReplies ? 'on' : '') + '">' + (f.excludeReplies ? t('noReplies') : t('withReplies')) + '</span>';
+      h += '</div>';
+      h += '<button class="btn btn-ghost btn-sm" onclick="toggleFilters(\'' + u.username + '\')" style="margin-top:8px">' + t('editFilters') + '</button>';
+      h += '<div id="filters-' + i + '" class="user-filters-box" style="display:none">';
+      h += buildFilterForm(u, i);
+      h += '<button class="btn btn-primary btn-sm" onclick="saveUserFilters(\'' + u.username + '\', ' + i + ')" style="margin-top:10px">' + t('save') + '</button>';
+      h += '</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  $('#tab-users').innerHTML = h;
+}
+
+/* ── Config cards ───────────────── */
+
+function renderCard(title, fields, saveKey) {
+  const btnLabels = {
+    discord: 'btnSaveD', telegram: 'btnSaveT', twitter: 'btnSaveTw', settings: 'btnSaveS',
+    General: 'btnSaveG', 'X to Image': 'btnSaveImg', 'Web UI': 'btnSaveW',
+  };
+  const btnLabel = t(btnLabels[title] || 'btnSaveD');
+  let h = '<div class="card"><div class="card-title">' + title + '</div>';
+  fields.forEach(f => { if (typeof f === 'string') h += f; else h += fldHTML(f.label, f.key, f.val, f.opts || {}); });
+  h += '<div class="btn-group"><button class="btn btn-primary btn-sm" onclick="saveSection(\'' + saveKey + '\')">' + btnLabel + '</button></div>';
+  h += '</div>';
+  return h;
+}
+
+async function saveSection(section) {
+  const fieldMap = {
+    discord: ['discord.enabled', 'discord.token', 'discord.channelId', 'discord.adminChannelId', 'discord.r14ChannelId', 'discord.approveRoleId', 'discord.embedColor'],
+    telegram: ['telegram.enabled', 'telegram.token', 'telegram.chatId', 'telegram.parseMode', 'telegram.apiRoot'],
+    twitter: ['twitter.authToken', 'twitter.ct0', 'twitter.username', 'twitter.password', 'twitter.email', 'twitter.totpSecret'],
+    settings: ['enableApproval', 'sendAsImage', 'xToImageApiUrl', 'xToImageApiToken', 'xToImageApiTheme', 'pollIntervalMinutes', 'maxPostsPerFetch', 'maxTweetAgeMinutes', 'imageCacheTtlMinutes', 'webui.port', 'webui.host', 'webui.password'],
+  };
+
+  const patch = {};
+  const intKeys = ['pollIntervalMinutes','maxPostsPerFetch','maxTweetAgeMinutes','imageCacheTtlMinutes','port'];
+  const boolKeys = ['enabled','enableApproval','sendAsImage'];
+
+  for (const k of (fieldMap[section] || [])) {
+    const val = getFld(k);
+    if (val === undefined) continue;
+    const parts = k.split('.');
+    let obj = patch;
+    for (let i = 0; i < parts.length - 1; i++) { if (!obj[parts[i]]) obj[parts[i]] = {}; obj = obj[parts[i]]; }
+    const last = parts[parts.length - 1];
+    if (boolKeys.includes(last)) obj[last] = document.getElementById('fld_' + k.replace(/\./g, '_')).checked;
+    else if (intKeys.includes(last)) obj[last] = parseInt(val) || 0;
+    else obj[last] = val;
+  }
+
+  if (section === 'telegram') {
+    patch.telegram = patch.telegram || {};
+    patch.telegram.adminChatIds = getChips('arr_admin_ids');
+  }
+  await saveFullConfig(patch);
+}
+
+function renderDiscord() {
+  const d = config.discord;
+  $('#tab-discord').innerHTML = renderCard('Discord', [
+    { label: t('enable'), key: 'discord.enabled', val: d.enabled, opts: { type: 'checkbox' } },
+    { label: t('botToken'), key: 'discord.token', val: d.token, opts: { isSecret: true, placeholder: t('hintNewToken'), hint: t('hintKeep') } },
+    { label: t('channelId'), key: 'discord.channelId', val: d.channelId },
+    { label: t('adminChannelId'), key: 'discord.adminChannelId', val: d.adminChannelId || '' },
+    { label: t('r14ChannelId'), key: 'discord.r14ChannelId', val: d.r14ChannelId || '' },
+    { label: t('approveRoleId'), key: 'discord.approveRoleId', val: d.approveRoleId || '' },
+    { label: t('embedColor'), key: 'discord.embedColor', val: d.embedColor, opts: { placeholder: t('phColor') } },
+  ], 'discord');
+}
+
+function renderTelegram() {
+  const tg = config.telegram;
+  $('#tab-telegram').innerHTML = renderCard('Telegram', [
+    { label: t('enable'), key: 'telegram.enabled', val: tg.enabled, opts: { type: 'checkbox' } },
+    { label: t('botToken'), key: 'telegram.token', val: tg.token, opts: { isSecret: true, placeholder: t('hintNewToken') } },
+    { label: t('chatId'), key: 'telegram.chatId', val: tg.chatId },
+    { label: t('parseMode'), key: 'telegram.parseMode', val: tg.parseMode || 'HTML', opts: { type: 'select', options: ['HTML', 'Markdown'] } },
+    { label: t('apiRoot'), key: 'telegram.apiRoot', val: tg.apiRoot || '', opts: { placeholder: t('hintProxy') } },
+    '<div class="field"><label>' + t('adminChatIds') + '</label><div class="chip-array" id="arr_admin_ids">' +
+    (tg.adminChatIds || []).map(id => chipHTML(id)).join('') +
+    '<input onkeydown="addChip(event, this, \'arr_admin_ids\')" placeholder="' + t('phAddId') + '"></div><div class="field-hint">' + t('hintEnterAdd') + '</div></div>',
+  ], 'telegram');
+}
+
+function renderTwitter() {
+  const tw = config.twitter;
+  $('#tab-twitter').innerHTML = renderCard('Twitter/X', [
+    { label: t('authToken'), key: 'twitter.authToken', val: tw.authToken, opts: { isSecret: true, hint: t('hintCookie') } },
+    { label: t('ct0'), key: 'twitter.ct0', val: tw.ct0, opts: { isSecret: true } },
+    { label: t('username'), key: 'twitter.username', val: tw.username, opts: { placeholder: t('hintPwdLogin') } },
+    { label: t('pwd'), key: 'twitter.password', val: tw.password, opts: { isSecret: true, placeholder: t('hintPwdLogin') } },
+    { label: t('email'), key: 'twitter.email', val: tw.email, opts: { placeholder: t('hintVerify') } },
+    { label: t('totpSecret'), key: 'twitter.totpSecret', val: tw.totpSecret, opts: { isSecret: true, placeholder: t('hint2fa') } },
+  ], 'twitter');
+}
+
+function renderSettings() {
+  const s = config, w = config.webui;
+  $('#tab-settings').innerHTML = '<div class="cards-grid">' +
+    renderCard(t('general'), [
+      { label: t('approvalMode'), key: 'enableApproval', val: s.enableApproval, opts: { type: 'checkbox', hint: t('hintApproval') } },
+      { label: t('sendAsImage'), key: 'sendAsImage', val: s.sendAsImage, opts: { type: 'checkbox' } },
+      { label: t('pollInterval'), key: 'pollIntervalMinutes', val: s.pollIntervalMinutes },
+      { label: t('maxPosts'), key: 'maxPostsPerFetch', val: s.maxPostsPerFetch },
+      { label: t('maxTweetAge'), key: 'maxTweetAgeMinutes', val: s.maxTweetAgeMinutes },
+      { label: t('imgCacheTtl'), key: 'imageCacheTtlMinutes', val: s.imageCacheTtlMinutes },
+    ], 'settings') +
+    renderCard(t('xToImg'), [
+      { label: t('apiUrl'), key: 'xToImageApiUrl', val: s.xToImageApiUrl || '' },
+      { label: t('apiToken'), key: 'xToImageApiToken', val: s.xToImageApiToken || '', opts: { isSecret: true } },
+      { label: t('theme'), key: 'xToImageApiTheme', val: s.xToImageApiTheme || 'dark', opts: { type: 'select', options: ['light', 'dim', 'dark'] } },
+    ], 'settings') +
+    renderCard(t('webUi'), [
+      { label: t('port'), key: 'webui.port', val: w.port },
+      { label: t('host'), key: 'webui.host', val: w.host },
+      { label: t('password'), key: 'webui.password', val: w.password, opts: { isSecret: true, placeholder: t('hintNoAuth') } },
+    ], 'settings') +
+    '</div>';
+}
+
+/* ── Logs ───────────────────────── */
+
+async function renderLogs() {
+  $('#tab-logs').innerHTML = '<div class="empty"><p>' + t('loading') + '</p></div>';
+  try {
+    const tweets = await api('/api/tweets?limit=100');
+    if (!tweets.length) {
+      $('#tab-logs').innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>' + t('noTweets') + '</p></div>';
+      return;
+    }
+    let h = '<table class="data-table"><thead><tr><th>' + t('thAuthor') + '</th><th>' + t('thContent') + '</th><th>' + t('thSent') + '</th></tr></thead><tbody>';
+    tweets.forEach(t => {
+      h += '<tr><td>@' + t.author + '</td><td class="col-content">' + (t.content || '').substring(0, 100) + '</td><td>' + new Date(t.sent_at).toLocaleString() + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    $('#tab-logs').innerHTML = h;
+  } catch(e) {
+    $('#tab-logs').innerHTML = '<div class="empty"><p style="color:var(--red)">' + t('logError') + e.message + '</p></div>';
+  }
+}
+
+/* ── Render + Nav ───────────────── */
+
+const tabLabels = { users: 'users', discord: 'discord', telegram: 'telegram', twitter: 'twitter', settings: 'settings', logs: 'log' };
+const tabIcons = { users: '👥', discord: '💬', telegram: '✈️', twitter: '🐦', settings: '⚙️', logs: '📋' };
+
+function render() {
+  if (!config) return;
+  renderStats();
+  renderUsers();
+  renderDiscord();
+  renderTelegram();
+  renderTwitter();
+  renderSettings();
+  const active = document.querySelector('.nav-item.active')?.dataset.tab;
+  if (active === 'logs') renderLogs();
+}
+
+function switchTab(name) {
+  $$('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector('[data-tab="' + name + '"]')?.classList.add('active');
+  $$('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name)?.classList.add('active');
+  $('#panel-label').textContent = t(tabLabels[name] || name);
+  $('#panel-icon').textContent = tabIcons[name] || '';
+  if (name === 'logs') renderLogs();
+}
+
+function updateLangButton() {
+  const btn = document.getElementById('lang-toggle');
+  if (btn) btn.textContent = t('langBtn');
+}
+
+function reloadUI() {
+  updateLangButton();
+  updateNavLabels();
+  render();
+  switchTab(document.querySelector('.nav-item.active')?.dataset.tab || 'users');
+}
+
+function updateNavLabels() {
+  $$('.nav-item').forEach(n => {
+    const tab = n.dataset.tab;
+    if (!tab || !tabLabels[tab]) return;
+    const dot = n.querySelector('.nav-dot');
+    const badge = n.querySelector('.nav-badge');
+    n.textContent = t(tabLabels[tab]);
+    if (dot) n.insertBefore(dot, n.firstChild);
+    if (badge) n.appendChild(badge);
+  });
+  const badge = document.getElementById('nav-user-count');
+  if (badge) badge.textContent = config ? config.users.length : 0;
+  const sidebarLabel = document.querySelector('.sidebar-label');
+  if (sidebarLabel) sidebarLabel.textContent = t('menu');
+  const subtitle = document.querySelector('.logo span');
+  if (subtitle) subtitle.textContent = t('twitterMonitor');
+  const status = document.querySelector('.header-status');
+  if (status) status.childNodes[1] ? status.childNodes[1].textContent = t('running') : null;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const savedLang = localStorage.getItem('lang');
+  if (savedLang && messages[savedLang]) lang = savedLang;
+  else if (navigator.language.startsWith('zh')) lang = 'zh-CN';
+
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) {
+    toggle.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '🌙' : '☀️';
+    toggle.title = t('toggleTheme');
+    toggle.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        toggle.textContent = '☀️';
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggle.textContent = '🌙';
+        localStorage.setItem('theme', 'dark');
+      }
+    });
+  }
+
+  updateLangButton();
+  document.getElementById('lang-toggle')?.addEventListener('click', () => {
+    lang = lang === 'zh-CN' ? 'en' : 'zh-CN';
+    localStorage.setItem('lang', lang);
+    updateLangButton();
+    updateNavLabels();
+    render();
+    switchTab(document.querySelector('.nav-item.active')?.dataset.tab || 'users');
+  });
+
+  loadConfig();
+  $$('.nav-item').forEach(n => n.addEventListener('click', () => switchTab(n.dataset.tab)));
+});
+</script>
+</body>
+</html>

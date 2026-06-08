@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import * as http from 'http';
 import { loadConfig, getConfig } from './config';
 import { fetchAllTweets } from './rss/fetcher';
 import { filterTweets, getPassedTweets } from './filters';
@@ -8,10 +9,12 @@ import { initDatabase, closeDatabase, markMultipleAsSent, cleanupOldRecords, cle
 import { sendForApproval, handleTelegramApproval, handleDiscordApproval, setTelegramBot, setDiscordClient } from './approval';
 import { initRenderer, shutdownRenderer } from './renderer';
 import { initTwitterClient, loginWithCredentials } from './twitter';
+import { startWebServer } from './web/server';
 import { ProcessedTweet, Tweet, UserConfig } from './types';
 
 let isRunning = false;
 let cronJob: cron.ScheduledTask | null = null;
+let webServer: http.Server | null = null;
 
 async function processAndSendTweets(username: string, tweets: Tweet[]): Promise<void> {
   const config = getConfig();
@@ -192,6 +195,7 @@ async function start(): Promise<void> {
   }
 
   console.log(`\nPoll interval: ${config.pollIntervalMinutes} minute(s)`);
+  webServer = startWebServer();
   console.log('Starting initial poll...\n');
 
   await pollAndSend();
@@ -207,6 +211,11 @@ async function shutdown(): Promise<void> {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
+  }
+
+  if (webServer) {
+    webServer.close();
+    webServer = null;
   }
 
   await shutdownDiscord();

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { parse as parseToml } from 'smol-toml';
 import { AppConfig } from './types';
 
@@ -17,6 +17,7 @@ const CONFIG_CANDIDATES = [
 
 let config: AppConfig | null = null;
 let loadedConfigPath: string | null = null;
+let rawConfigData: Record<string, any> | null = null;
 
 export function findConfigFile(): string {
   for (const candidate of CONFIG_CANDIDATES) {
@@ -53,7 +54,8 @@ export function loadConfig(configPath?: string): AppConfig {
   }
 
   const filePath = configPath || findConfigFile();
-  const rawConfig = parseConfigFile(filePath);
+  rawConfigData = parseConfigFile(filePath);
+  const rawConfig = rawConfigData;
   loadedConfigPath = filePath;
 
   const loadedConfig = {
@@ -73,6 +75,12 @@ export function loadConfig(configPath?: string): AppConfig {
       password: process.env.TWITTER_PASSWORD || rawConfig.twitter?.password,
       email: process.env.TWITTER_EMAIL || rawConfig.twitter?.email,
       totpSecret: process.env.TWITTER_TOTP_SECRET || rawConfig.twitter?.totpSecret,
+    },
+    webui: {
+      enabled: rawConfig.webui?.enabled ?? true,
+      port: rawConfig.webui?.port ?? 3000,
+      host: rawConfig.webui?.host ?? '0.0.0.0',
+      password: rawConfig.webui?.password ?? '',
     },
     xToImageApiUrl: process.env.X_TO_IMAGE_API_URL || rawConfig.xToImageApiUrl,
     xToImageApiToken: process.env.X_TO_IMAGE_API_TOKEN || rawConfig.xToImageApiToken,
@@ -141,4 +149,52 @@ export function getConfig(): AppConfig {
 
 export function getConfigPath(): string | null {
   return loadedConfigPath;
+}
+
+export function saveConfig(newConfig: AppConfig): void {
+  if (!loadedConfigPath || !rawConfigData) {
+    throw new Error('No config file loaded');
+  }
+
+  rawConfigData.users = newConfig.users;
+  rawConfigData.discord = newConfig.discord;
+  rawConfigData.telegram = newConfig.telegram;
+  rawConfigData.twitter = newConfig.twitter;
+  rawConfigData.webui = newConfig.webui;
+  rawConfigData.enableApproval = newConfig.enableApproval;
+  rawConfigData.sendAsImage = newConfig.sendAsImage;
+  rawConfigData.xToImageApiUrl = newConfig.xToImageApiUrl;
+  rawConfigData.xToImageApiToken = newConfig.xToImageApiToken;
+  rawConfigData.xToImageApiTheme = newConfig.xToImageApiTheme;
+  rawConfigData.imageCacheTtlMinutes = newConfig.imageCacheTtlMinutes;
+  rawConfigData.pollIntervalMinutes = newConfig.pollIntervalMinutes;
+  rawConfigData.maxPostsPerFetch = newConfig.maxPostsPerFetch;
+  rawConfigData.maxTweetAgeMinutes = newConfig.maxTweetAgeMinutes;
+
+  const ext = path.extname(loadedConfigPath).toLowerCase();
+  let content: string;
+
+  switch (ext) {
+    case '.yaml':
+    case '.yml':
+      content = stringifyYaml(rawConfigData);
+      break;
+    case '.json':
+      content = JSON.stringify(rawConfigData, null, 2);
+      break;
+    default:
+      throw new Error(`Unsupported config format for saving: ${ext}`);
+  }
+
+  fs.writeFileSync(loadedConfigPath, content, 'utf-8');
+
+  config = newConfig;
+  console.log(`Configuration saved to ${loadedConfigPath}`);
+}
+
+export function reloadConfig(): AppConfig {
+  config = null;
+  rawConfigData = null;
+  loadedConfigPath = null;
+  return loadConfig();
 }
