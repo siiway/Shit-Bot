@@ -3,14 +3,14 @@ import * as http from 'http';
 import { loadConfig, getConfig } from './config';
 import { fetchAllTweets } from './rss/fetcher';
 import { filterTweets, getPassedTweets } from './filters';
-import { initDiscord, sendBatchToDiscord, shutdownDiscord, getDiscordClient } from './bots/discord';
-import { initTelegram, sendBatchToTelegram, shutdownTelegram, getTelegramBot } from './bots/telegram';
+import { initDiscord, shutdownDiscord, getDiscordClient } from './bots/discord';
+import { initTelegram, shutdownTelegram, getTelegramBot } from './bots/telegram';
 import { initDatabase, closeDatabase, markMultipleAsSent, cleanupOldRecords, cleanupExpiredImages } from './storage';
-import { sendForApproval, handleTelegramApproval, handleDiscordApproval, setTelegramBot, setDiscordClient } from './approval';
+import { sendForApproval, sendToAllGroups, handleTelegramApproval, handleDiscordApproval, setTelegramBot, setDiscordClient } from './approval';
 import { initRenderer, shutdownRenderer } from './renderer';
 import { initTwitterClient, loginWithCredentials } from './twitter';
 import { startWebServer } from './web/server';
-import { ProcessedTweet, Tweet, UserConfig } from './types';
+import { Tweet } from './types';
 
 let isRunning = false;
 let cronJob: cron.ScheduledTask | null = null;
@@ -40,21 +40,12 @@ async function processAndSendTweets(username: string, tweets: Tweet[]): Promise<
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   } else {
-    let sentTweets: ProcessedTweet[] = [];
-
-    if (config.discord.enabled) {
-      const discordSent = await sendBatchToDiscord(passed);
-      sentTweets = passed.slice(0, discordSent);
+    for (const tweet of passed) {
+      await sendToAllGroups(tweet);
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (config.telegram.enabled) {
-      const telegramSent = await sendBatchToTelegram(passed);
-      if (sentTweets.length === 0) {
-        sentTweets = passed.slice(0, telegramSent);
-      }
-    }
-
-    markMultipleAsSent(sentTweets.map(t => ({
+    markMultipleAsSent(passed.map(t => ({
       id: t.id,
       author: t.author,
       content: t.content,

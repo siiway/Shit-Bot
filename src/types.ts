@@ -89,6 +89,30 @@ export interface AppConfig {
   pollIntervalMinutes: number;
   maxPostsPerFetch: number;
   maxTweetAgeMinutes: number;
+  groups?: GroupConfig[];
+}
+
+export interface GroupTelegramConfig {
+  chatId: string;
+  targets?: Record<string, { chatId: string }>;
+}
+
+export interface GroupDiscordConfig {
+  channelId: string;
+  r14ChannelId?: string;
+}
+
+export interface GroupApprovalConfig {
+  telegramAdminChatIds?: string[];
+  discordAdminChannelId?: string;
+  discordApproveRoleId?: string;
+}
+
+export interface GroupConfig {
+  name: string;
+  telegram?: GroupTelegramConfig;
+  discord?: GroupDiscordConfig;
+  approval?: GroupApprovalConfig;
 }
 
 export interface ProcessedTweet extends Tweet {

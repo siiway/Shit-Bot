@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { parse as parseToml } from 'smol-toml';
-import { AppConfig } from './types';
+import { AppConfig, GroupConfig } from './types';
 
 const CONFIG_CANDIDATES = [
   'config.yaml',
@@ -138,11 +138,37 @@ function validateConfig(cfg: AppConfig): void {
     cfg.imageCacheTtlMinutes = 60;
   }
 
-  if (cfg.enableApproval) {
-    const hasTelegramAdmins = cfg.telegram.enabled && cfg.telegram.adminChatIds && cfg.telegram.adminChatIds.length > 0;
-    const hasDiscordAdmin = cfg.discord.enabled && cfg.discord.adminChannelId;
+  if (cfg.groups && cfg.groups.length > 0) {
+    const names = new Set<string>();
+    for (const g of cfg.groups) {
+      if (!g.name) {
+        throw new Error('Each group must have a name');
+      }
+      if (names.has(g.name)) {
+        throw new Error(`Duplicate group name: ${g.name}`);
+      }
+      names.add(g.name);
 
-    if (!hasTelegramAdmins && !hasDiscordAdmin) {
+      if (g.telegram && !g.telegram.chatId) {
+        throw new Error(`Group "${g.name}" has telegram config but no chatId`);
+      }
+      if (g.discord && !g.discord.channelId) {
+        throw new Error(`Group "${g.name}" has discord config but no channelId`);
+      }
+    }
+  }
+
+  if (cfg.enableApproval) {
+    const hasRootAdmins =
+      (cfg.telegram.enabled && cfg.telegram.adminChatIds && cfg.telegram.adminChatIds.length > 0) ||
+      (cfg.discord.enabled && cfg.discord.adminChannelId);
+
+    const hasGroupAdmins = cfg.groups?.some(g =>
+      (g.telegram && g.approval?.telegramAdminChatIds?.length) ||
+      (g.discord && g.approval?.discordAdminChannelId)
+    );
+
+    if (!hasRootAdmins && !hasGroupAdmins) {
       console.warn('Approval enabled but no admin configured, disabling approval');
       cfg.enableApproval = false;
     }
@@ -154,6 +180,32 @@ export function getConfig(): AppConfig {
     return loadConfig();
   }
   return config;
+}
+
+export function getEffectiveGroups(): GroupConfig[] {
+  const cfg = getConfig();
+  if (cfg.groups && cfg.groups.length > 0) {
+    return cfg.groups;
+  }
+
+  const groups: GroupConfig[] = [{
+    name: 'default',
+    telegram: cfg.telegram.enabled ? {
+      chatId: cfg.telegram.chatId,
+      targets: cfg.telegram.targets,
+    } : undefined,
+    discord: cfg.discord.enabled ? {
+      channelId: cfg.discord.channelId,
+      r14ChannelId: cfg.discord.r14ChannelId,
+    } : undefined,
+    approval: {
+      telegramAdminChatIds: cfg.telegram.adminChatIds,
+      discordAdminChannelId: cfg.discord.adminChannelId,
+      discordApproveRoleId: cfg.discord.approveRoleId,
+    },
+  }];
+
+  return groups;
 }
 
 export function getConfigPath(): string | null {
@@ -179,6 +231,7 @@ export function saveConfig(newConfig: AppConfig): void {
   rawConfigData.pollIntervalMinutes = newConfig.pollIntervalMinutes;
   rawConfigData.maxPostsPerFetch = newConfig.maxPostsPerFetch;
   rawConfigData.maxTweetAgeMinutes = newConfig.maxTweetAgeMinutes;
+  rawConfigData.groups = newConfig.groups;
 
   const ext = path.extname(loadedConfigPath).toLowerCase();
   let content: string;
