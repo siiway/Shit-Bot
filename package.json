@@ -8,7 +8,7 @@
     "build": "tsc && cp src/web/ui.html dist/web/ui.html",
     "build:binary": "bun build src/index.ts --compile --outfile dist/shit-bot && cp src/web/ui.html dist/ui.html",
     "build:binary:docker": "docker run --rm -v $(pwd):/app -w /app oven/bun sh -c 'bun install && bun build src/index.ts --compile --outfile dist/shit-bot && cp src/web/ui.html dist/ui.html'",
-    "start": "node dist/index.js",
+    "start": "bun run dist/index.js",
     "dev": "bun run src/index.ts",
     "deploy": "bunx hugo && wrangler deploy",
     "preview": "bunx hugo && wrangler dev"
