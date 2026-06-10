@@ -1,5 +1,5 @@
 import { Context, Markup } from 'telegraf';
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel, ButtonInteraction, Client, AttachmentBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel, ButtonInteraction, Client, AttachmentBuilder, MessageFlags } from 'discord.js';
 import { ProcessedTweet, GroupConfig } from './types';
 import { getConfig, getEffectiveGroups } from './config';
 import { formatTweetHTML, escapeHTML, formatContentForPlatform } from './filters';
@@ -544,7 +544,7 @@ export async function handleDiscordApproval(interaction: ButtonInteraction): Pro
     console.error('Discord approval handler error:', err);
     try {
       if (!interaction.replied) {
-        await interaction.reply({ content: 'An error occurred', ephemeral: true });
+        await interaction.reply({ content: 'An error occurred', flags: MessageFlags.Ephemeral });
       }
     } catch {}
   }
@@ -573,12 +573,12 @@ async function handleDiscordApprovalImpl(interaction: ButtonInteraction): Promis
   const pending = pendingApprovals.get(approvalId);
 
   if (!pending) {
-    await interaction.reply({ content: 'Approval not found or expired', ephemeral: true });
+    await interaction.reply({ content: 'Approval not found or expired', flags: MessageFlags.Ephemeral });
     return;
   }
 
   if (pending.approved) {
-    await interaction.reply({ content: 'This tweet has already been approved', ephemeral: true });
+    await interaction.reply({ content: 'This tweet has already been approved', flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -588,13 +588,13 @@ async function handleDiscordApprovalImpl(interaction: ButtonInteraction): Promis
   if (group?.approval?.discordApproveRoleId) {
     const member = interaction.member;
     if (!member || !('roles' in member) || !(member.roles as any).cache?.has(group.approval.discordApproveRoleId)) {
-      await interaction.reply({ content: '❌ 你没有审批权限', ephemeral: true });
+      await interaction.reply({ content: '❌ 你没有审批权限', flags: MessageFlags.Ephemeral });
       return;
     }
   } else if (config.discord.approveRoleId) {
     const member = interaction.member;
     if (!member || !('roles' in member) || !(member.roles as any).cache?.has(config.discord.approveRoleId)) {
-      await interaction.reply({ content: '❌ 你没有审批权限', ephemeral: true });
+      await interaction.reply({ content: '❌ 你没有审批权限', flags: MessageFlags.Ephemeral });
       return;
     }
   }
