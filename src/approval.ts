@@ -91,6 +91,22 @@ function getGroupTargetTags(group: GroupConfig): { tag: string; telegram: boolea
   return tags;
 }
 
+async function dispatchGroupDirect(tweet: ProcessedTweet, group: GroupConfig, imageBuffer: Buffer | null): Promise<void> {
+  const config = getConfig();
+  const imageBuf = imageBuffer || getCachedImage(tweet.id) || undefined;
+
+  if (group.telegram && config.telegram.enabled) {
+    withTimeout(sendToTelegram(tweet, group.telegram.chatId, true, imageBuf).then(Boolean), 20000, `${group.name}/Telegram`);
+    for (const [tag, target] of Object.entries(group.telegram.targets || {})) {
+      withTimeout(sendToTelegram(tweet, target.chatId, true, imageBuf).then(Boolean), 20000, `${group.name}/Telegram/${tag}`);
+    }
+  }
+
+  if (group.discord && config.discord.enabled) {
+    withTimeout(sendToDiscord(tweet, group.discord.channelId, true, imageBuf).then(Boolean), 20000, `${group.name}/Discord`);
+  }
+}
+
 export async function sendForApproval(tweet: ProcessedTweet): Promise<boolean> {
   const config = getConfig();
   const groups = getEffectiveGroups();
@@ -287,6 +303,12 @@ export async function sendForApproval(tweet: ProcessedTweet): Promise<boolean> {
       });
 
       console.log(`Sent tweet ${tweet.id} for approval (group: ${group.name}): ${approvalId}`);
+    }
+
+    if (!sentToTelegram && !sentToDiscord) {
+      anySent = true;
+      console.log(`Group ${group.name} has no approval config, sending directly`);
+      await dispatchGroupDirect(tweet, group, imageBuffer);
     }
   }
 
