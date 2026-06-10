@@ -579,6 +579,86 @@
   .toggle input:checked + .toggle-slider { background: var(--accent); }
   .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
 
+  /* ── Login Page ────────────────── */
+
+  .login-overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    z-index: 200;
+  }
+
+  .login-card {
+    width: 360px; max-width: 90vw;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 40px 32px 32px;
+    text-align: center;
+  }
+
+  .login-card .login-logo {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, #e8a085, #d4785c);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #fff;
+    margin: 0 auto 18px;
+    box-shadow: 0 2px 12px rgba(212,120,92,0.25);
+  }
+
+  .login-card h2 {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 6px;
+  }
+
+  .login-card .login-sub {
+    font-size: 13px; color: var(--text-dim);
+    margin-bottom: 24px;
+  }
+
+  .login-card input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-bright);
+    font-family: var(--font-body); font-size: 14px;
+    outline: none; text-align: center;
+    transition: all var(--transition);
+  }
+
+  .login-card input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    background: var(--bg-card);
+  }
+
+  .login-card .login-btn {
+    width: 100%; margin-top: 16px;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #fff; font-family: var(--font-body);
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .login-card .login-btn:hover {
+    background: #c56a4e;
+    box-shadow: 0 2px 12px rgba(212,120,92,0.3);
+  }
+
+  .login-card .login-err {
+    font-size: 12px; color: var(--red);
+    margin-top: 12px; min-height: 18px;
+  }
+
   /* ── Responsive ────────────────── */
 
   @media (max-width: 720px) {
@@ -601,6 +681,16 @@
 </style>
 </head>
 <body>
+<div id="login-overlay" class="login-overlay" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">◇</div>
+    <h2>ShitBot</h2>
+    <p class="login-sub" id="login-sub">Enter password to access</p>
+    <input type="password" id="login-input" placeholder="Password" autofocus>
+    <button class="login-btn" id="login-btn">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
 <div class="app">
   <header>
     <div class="logo">
@@ -626,6 +716,7 @@
       <button class="nav-item" data-tab="discord"><span class="nav-dot"></span>Discord</button>
       <button class="nav-item" data-tab="telegram"><span class="nav-dot"></span>Telegram</button>
       <button class="nav-item" data-tab="twitter"><span class="nav-dot"></span>Twitter/X</button>
+      <button class="nav-item" data-tab="groups"><span class="nav-dot"></span>Groups</button>
       <button class="nav-item" data-tab="settings"><span class="nav-dot"></span>Settings</button>
       <button class="nav-item" data-tab="logs"><span class="nav-dot"></span>Log</button>
     </nav>
@@ -640,6 +731,7 @@
         <div id="tab-discord" class="tab-content"></div>
         <div id="tab-telegram" class="tab-content"></div>
         <div id="tab-twitter" class="tab-content"></div>
+        <div id="tab-groups" class="tab-content"></div>
         <div id="tab-settings" class="tab-content"></div>
         <div id="tab-logs" class="tab-content"></div>
       </div>
@@ -684,6 +776,18 @@ const messages = {
     loading: 'Loading...', noTweets: 'No tweets forwarded yet.', thAuthor: 'Author', thContent: 'Content',
     thSent: 'Sent', logError: 'Error: ', unauthPrompt: 'Enter WebUI password:',
     langBtn: '中文',
+    // Groups
+    groups: 'Groups', groupName: 'Group Name', tgChatId: 'Group Chat ID',
+    dcChannelId: 'Group Channel ID', r14DcChannelId: 'R14 Channel ID',
+    tgTargets: 'Targets (tag: chatId)', tgApprovalChatIds: 'Approval Telegram IDs',
+    dcApprovalChannelId: 'Approval Discord Channel', dcApproveRoleId: 'Approval Role ID',
+    blockedUsers: 'Blocked Users', blockedUsersHint: 'Tweets from these users will not be pushed to this group',
+    addGroup: 'Add Group', removeGroup: 'Remove Group', saveGroup: 'Save Group',
+    noGroups: 'No groups. Groups let you route tweets to different Telegram/Discord channels.',
+    groupExists: 'Group already exists', groupNameRequired: 'Group name required',
+    addedGroup: 'Added group', removedGroup: 'Removed group', updatedGroup: 'Updated group',
+    addTargetEntry: 'Add target...', addBlockedUser: 'Add username...',
+    groupTelegram: 'Group Telegram', groupDiscord: 'Group Discord', groupApproval: 'Approval Settings',
   },
   'zh-CN': {
     menu: '菜单', users: '用户', discord: 'Discord', telegram: 'Telegram', twitter: 'Twitter/X', settings: '设置', log: '日志',
@@ -715,6 +819,18 @@ const messages = {
     loading: '加载中...', noTweets: '暂无已推送推文。', thAuthor: '作者', thContent: '内容',
     thSent: '推送时间', logError: '错误: ', unauthPrompt: '请输入 WebUI 密码:',
     langBtn: 'English',
+    // Groups
+    groups: '分组', groupName: '分组名称', tgChatId: '分组 Chat ID',
+    dcChannelId: '分组频道 ID', r14DcChannelId: 'R14 频道 ID',
+    tgTargets: '目标 (标签: chatId)', tgApprovalChatIds: '审批 Telegram ID',
+    dcApprovalChannelId: '审批 Discord 频道', dcApproveRoleId: '审批角色 ID',
+    blockedUsers: '屏蔽用户', blockedUsersHint: '这些用户的推文不会被推送到该分组',
+    addGroup: '添加分组', removeGroup: '删除分组', saveGroup: '保存分组',
+    noGroups: '暂无分组。分组可以将推文路由到不同的 Telegram/Discord 频道。',
+    groupExists: '分组已存在', groupNameRequired: '请输入分组名称',
+    addedGroup: '已添加分组', removedGroup: '已删除分组', updatedGroup: '已更新分组',
+    addTargetEntry: '添加目标...', addBlockedUser: '添加用户名...',
+    groupTelegram: '分组 Telegram', groupDiscord: '分组 Discord', groupApproval: '审批设置',
   }
 };
 
@@ -729,17 +845,50 @@ const $$ = s => document.querySelectorAll(s);
 
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const storedPw = sessionStorage.getItem('password');
+  if (storedPw) opts.headers['Authorization'] = 'Basic ' + btoa(':' + storedPw);
   if (body) opts.body = JSON.stringify(body);
   const resp = await fetch(path, opts);
   if (resp.status === 401) {
-    const pw = prompt(t('unauthPrompt'));
-    if (!pw) throw new Error('Unauthorized');
-    opts.headers = { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + btoa(':' + pw) };
-    if (body) opts.body = JSON.stringify(body);
-    const retry = await fetch(path, opts);
-    return retry.json();
+    sessionStorage.removeItem('password');
+    showLogin();
+    throw new Error('Unauthorized');
   }
   return resp.json();
+}
+
+function showLogin() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  const app = document.querySelector('.app');
+  if (app) app.style.display = 'none';
+}
+
+function hideLogin() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.style.display = 'none';
+  const app = document.querySelector('.app');
+  if (app) app.style.display = '';
+}
+
+async function tryLogin() {
+  const pw = document.getElementById('login-input')?.value.trim();
+  if (!pw) return;
+  const errEl = document.getElementById('login-err');
+  try {
+    const resp = await fetch('/api/config', {
+      headers: { 'Authorization': 'Basic ' + btoa(':' + pw), 'Content-Type': 'application/json' }
+    });
+    if (resp.status === 401) {
+      if (errEl) errEl.textContent = 'Invalid password';
+      return;
+    }
+    sessionStorage.setItem('password', pw);
+    hideLogin();
+    await loadConfig();
+  } catch (e) {
+    if (errEl) errEl.textContent = 'Connection failed';
+  }
 }
 
 function toast(msg, type) {
@@ -1052,6 +1201,121 @@ function renderSettings() {
     '</div>';
 }
 
+/* ── Groups ─────────────────────── */
+
+async function addGroup() {
+  const gname = $('#new-group-name').value.trim();
+  if (!gname) { toast(t('groupNameRequired'), 'error'); return; }
+  try {
+    await api('/api/groups', 'POST', { name: gname });
+    toast(t('addedGroup') + ' ' + gname);
+    await loadConfig();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function removeGroup(gname) {
+  if (!confirm(gname + ' ?')) return;
+  await api('/api/groups/' + gname, 'DELETE');
+  toast(t('removedGroup') + ' ' + gname);
+  await loadConfig();
+}
+
+async function saveGroup(gname) {
+  const telChatId = document.getElementById('grp_tg_' + gname)?.value?.trim() || '';
+  const dcChanId = document.getElementById('grp_dc_' + gname)?.value?.trim() || '';
+  const dcR14 = document.getElementById('grp_dcr14_' + gname)?.value?.trim() || '';
+  const approvalTgAdminIds = getChips('grp_approval_tg_' + gname);
+  const approvalDcChan = document.getElementById('grp_approval_dc_' + gname)?.value?.trim() || '';
+  const approvalDcRole = document.getElementById('grp_approval_role_' + gname)?.value?.trim() || '';
+  const blockedUsers = getChips('grp_blocked_' + gname);
+  const targetsRaw = getChips('grp_targets_' + gname);
+  const targets = {};
+  targetsRaw.forEach(e => {
+    const idx = e.indexOf(':');
+    if (idx > 0) {
+      const tag = e.substring(0, idx).trim();
+      const chatId = e.substring(idx + 1).trim();
+      if (tag && chatId) targets[tag] = { chatId };
+    }
+  });
+
+  const group = {};
+  if (telChatId) group.telegram = { chatId: telChatId, targets: Object.keys(targets).length > 0 ? targets : undefined };
+  else group.telegram = undefined;
+  if (dcChanId || dcR14) group.discord = { channelId: dcChanId || '', r14ChannelId: dcR14 || '' };
+  else group.discord = undefined;
+  if (approvalTgAdminIds.length > 0 || approvalDcChan || approvalDcRole) {
+    group.approval = {};
+    if (approvalTgAdminIds.length > 0) group.approval.telegramAdminChatIds = approvalTgAdminIds;
+    if (approvalDcChan) group.approval.discordAdminChannelId = approvalDcChan;
+    if (approvalDcRole) group.approval.discordApproveRoleId = approvalDcRole;
+  }
+  if (blockedUsers.length > 0) group.blockedUsers = blockedUsers;
+
+  await api('/api/groups/' + gname, 'PUT', group);
+  toast(t('updatedGroup') + ' ' + gname);
+  await loadConfig();
+}
+
+function renderGroups() {
+  const groups = config.groups || [];
+  let h = '<div class="add-bar">';
+  h += '<div class="field"><label>' + t('groupName') + '</label><input id="new-group-name" placeholder="my-group"></div>';
+  h += '<div></div>';
+  h += '<button class="btn btn-primary" onclick="addGroup()" style="height:42px">' + t('addGroup') + '</button>';
+  h += '</div>';
+
+  if (!groups.length) {
+    h += '<div class="empty"><div class="empty-icon">📦</div><p>' + t('noGroups') + '</p></div>';
+  } else {
+    h += '<div class="user-list">';
+    groups.forEach(g => {
+      const tg = g.telegram;
+      const dc = g.discord;
+      const ap = g.approval;
+      const bl = g.blockedUsers || [];
+      const tgTargets = tg?.targets ? Object.entries(tg.targets).map(([tag, t]) => tag + ': ' + t.chatId) : [];
+
+      h += '<div class="user-card">';
+      h += '<div class="user-card-top">';
+      h += '<span style="font-weight:600;font-size:14px;color:var(--text-bright)">📦 ' + g.name + '</span>';
+      h += '<button class="btn btn-danger btn-xs" onclick="removeGroup(\'' + g.name + '\')">' + t('removeGroup') + '</button>';
+      h += '</div>';
+
+      h += '<div class="user-filters-box" style="margin-left:0">';
+      h += '<div class="card-title" style="margin-bottom:12px;padding-bottom:8px">' + t('groupTelegram') + '</div>';
+      h += '<div class="field-row">';
+      h += '<div class="field"><label>' + t('tgChatId') + '</label><input id="grp_tg_' + g.name + '" value="' + (tg?.chatId || '') + '"></div>';
+      h += '<div class="field"><label>' + t('tgTargets') + '</label><div class="chip-array" id="grp_targets_' + g.name + '">';
+      tgTargets.forEach(e => h += chipHTML(e));
+      h += '<input onkeydown="addChip(event, this, \'grp_targets_' + g.name + '\')" placeholder="r14: -100...">';
+      h += '</div></div></div>';
+      h += '<div class="card-title" style="margin:14px 0 12px;padding-bottom:8px">' + t('groupDiscord') + '</div>';
+      h += '<div class="field-row">';
+      h += '<div class="field"><label>' + t('dcChannelId') + '</label><input id="grp_dc_' + g.name + '" value="' + (dc?.channelId || '') + '"></div>';
+      h += '<div class="field"><label>' + t('r14DcChannelId') + '</label><input id="grp_dcr14_' + g.name + '" value="' + (dc?.r14ChannelId || '') + '"></div>';
+      h += '</div></div>';
+      h += '<div class="card-title" style="margin:14px 0 12px;padding-bottom:8px">' + t('groupApproval') + '</div>';
+      h += '<div class="field-row">';
+      h += '<div class="field"><label>' + t('tgApprovalChatIds') + '</label><div class="chip-array" id="grp_approval_tg_' + g.name + '">';
+      (ap?.telegramAdminChatIds || []).forEach(id => h += chipHTML(id));
+      h += '<input onkeydown="addChip(event, this, \'grp_approval_tg_' + g.name + '\')" placeholder="' + t('phAddId') + '">';
+      h += '</div></div><div class="field"><label>' + t('dcApprovalChannelId') + '</label><input id="grp_approval_dc_' + g.name + '" value="' + (ap?.discordAdminChannelId || '') + '"></div>';
+      h += '</div><div class="field" style="margin-top:8px"><label>' + t('dcApproveRoleId') + '</label><input id="grp_approval_role_' + g.name + '" value="' + (ap?.discordApproveRoleId || '') + '"></div>';
+      h += '<div class="card-title" style="margin:14px 0 12px;padding-bottom:8px">' + t('blockedUsers') + '</div>';
+      h += '<div class="field"><div class="field-hint" style="margin-bottom:6px">' + t('blockedUsersHint') + '</div><div class="chip-array" id="grp_blocked_' + g.name + '">';
+      bl.forEach(u => h += chipHTML(u));
+      h += '<input onkeydown="addChip(event, this, \'grp_blocked_' + g.name + '\')" placeholder="' + t('addBlockedUser') + '">';
+      h += '</div></div>';
+      h += '<button class="btn btn-primary btn-sm" onclick="saveGroup(\'' + g.name + '\')" style="margin-top:12px">' + t('saveGroup') + '</button>';
+      h += '</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  $('#tab-groups').innerHTML = h;
+}
+
 /* ── Logs ───────────────────────── */
 
 async function renderLogs() {
@@ -1075,8 +1339,8 @@ async function renderLogs() {
 
 /* ── Render + Nav ───────────────── */
 
-const tabLabels = { users: 'users', discord: 'discord', telegram: 'telegram', twitter: 'twitter', settings: 'settings', logs: 'log' };
-const tabIcons = { users: '👥', discord: '💬', telegram: '✈️', twitter: '🐦', settings: '⚙️', logs: '📋' };
+const tabLabels = { users: 'users', discord: 'discord', telegram: 'telegram', twitter: 'twitter', groups: 'groups', settings: 'settings', logs: 'log' };
+const tabIcons = { users: '👥', discord: '💬', telegram: '✈️', twitter: '🐦', groups: '📦', settings: '⚙️', logs: '📋' };
 
 function render() {
   if (!config) return;
@@ -1085,6 +1349,7 @@ function render() {
   renderDiscord();
   renderTelegram();
   renderTwitter();
+  renderGroups();
   renderSettings();
   const active = document.querySelector('.nav-item.active')?.dataset.tab;
   if (active === 'logs') renderLogs();
@@ -1170,7 +1435,23 @@ document.addEventListener('DOMContentLoaded', () => {
     switchTab(document.querySelector('.nav-item.active')?.dataset.tab || 'users');
   });
 
-  loadConfig();
+  document.getElementById('login-btn')?.addEventListener('click', tryLogin);
+  document.getElementById('login-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') tryLogin();
+  });
+
+  const storedPw = sessionStorage.getItem('password');
+  if (!storedPw) {
+    showLogin();
+    document.getElementById('login-input')?.focus();
+  } else {
+    loadConfig().catch((e) => {
+      if (e.message === 'Unauthorized') {
+        document.getElementById('login-input')?.focus();
+      }
+    });
+  }
+
   $$('.nav-item').forEach(n => n.addEventListener('click', () => switchTab(n.dataset.tab)));
 });
 </script>
