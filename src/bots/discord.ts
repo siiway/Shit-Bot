@@ -26,13 +26,17 @@ export async function initDiscord(): Promise<boolean> {
 
     await client.login(config.discord.token);
 
-    const channel = await client.channels.fetch(config.discord.channelId);
-    if (!channel || !channel.isTextBased()) {
-      throw new Error(`Discord channel ${config.discord.channelId} not found or is not a text channel`);
+    if (config.discord.channelId) {
+      const channel = await client.channels.fetch(config.discord.channelId);
+      if (!channel || !channel.isTextBased()) {
+        throw new Error(`Discord channel ${config.discord.channelId} not found or is not a text channel`);
+      }
+      targetChannel = channel as TextChannel;
+      console.log(`Discord bot connected, targeting channel: ${targetChannel.name}`);
+    } else {
+      console.log('Discord bot connected (groups will specify target channels)');
     }
 
-    targetChannel = channel as TextChannel;
-    console.log(`Discord bot connected, targeting channel: ${targetChannel.name}`);
     return true;
   } catch (error) {
     console.error('Failed to initialize Discord:', error);
