@@ -1149,6 +1149,7 @@ async function removeGroup(gname) {
 }
 
 async function saveGroup(gname) {
+  const existingGroup = (config.groups || []).find(g => g.name === gname);
   const userNames = getChips('grp_users_' + gname);
   const telChatId = document.getElementById('grp_tg_' + gname)?.value?.trim() || '';
   const dcChanId = document.getElementById('grp_dc_' + gname)?.value?.trim() || '';
@@ -1170,12 +1171,19 @@ async function saveGroup(gname) {
 
   const group = {};
   if (userNames.length > 0) {
-    group.users = userNames.map(u => ({ username: u.trim(), displayName: u.trim(), filters: {} }));
+    const existingUsers = (existingGroup?.users || []);
+    const existingMap = {};
+    existingUsers.forEach(u => { existingMap[u.username] = u; });
+    group.users = userNames.map(u => {
+      const trimmed = u.trim();
+      return existingMap[trimmed] || { username: trimmed, displayName: trimmed, filters: {} };
+    });
+  } else {
+    group.users = [];
   }
   if (telChatId) group.telegram = { chatId: telChatId, targets: Object.keys(targets).length > 0 ? targets : undefined };
   else group.telegram = undefined;
   if (dcChanId || dcR14) group.discord = { channelId: dcChanId || '', r14ChannelId: dcR14 || '' };
-  else group.discord = undefined;
   else group.discord = undefined;
   if (approvalTgAdminIds.length > 0 || approvalDcChan || approvalDcRole) {
     group.approval = {};
