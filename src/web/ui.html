@@ -973,7 +973,10 @@ function getChips(id) {
 /* ── Stats ──────────────────────── */
 
 function renderStats() {
-  const u = config.users.length;
+  const groups = config.groups || [];
+  const userSet = new Set();
+  groups.forEach(g => (g.users || []).forEach(u => userSet.add(u.username)));
+  const u = userSet.size;
   const d = config.discord.enabled ? t('on') : t('off');
   const tg = config.telegram.enabled ? t('on') : t('off');
   const p = config.pollIntervalMinutes + t('minUnit');
@@ -996,63 +999,6 @@ function avatarHTML(username, displayName) {
     ' onerror="this.style.display=\'none\';this.parentElement.textContent=\'' + ch + '\'"' +
     ' loading="lazy">' +
     '</div>';
-}
-
-function buildFilterForm(u, i) {
-  const incs = ((u.filters || {}).keywords || {}).include || [];
-  const excs = ((u.filters || {}).keywords || {}).exclude || [];
-  const med = (u.filters || {}).media || {};
-
-  let h = '<div class="field-row">';
-  h += '<div class="field"><label>' + t('includeKw') + '</label><div class="chip-array" id="arr_inc_' + i + '">';
-  incs.forEach(k => h += chipHTML(k));
-  h += '<input onkeydown="addChip(event, this, \'arr_inc_' + i + '\')" placeholder="' + t('addKw') + '"></div></div>';
-  h += '<div class="field"><label>' + t('excludeKw') + '</label><div class="chip-array" id="arr_exc_' + i + '">';
-  excs.forEach(k => h += chipHTML(k));
-  h += '<input onkeydown="addChip(event, this, \'arr_exc_' + i + '\')" placeholder="' + t('addKw') + '"></div></div>';
-  h += '</div>';
-  h += '<div class="field-row-3" style="margin-top:8px">';
-  h += '<div class="field field-inline"><input type="checkbox" id="fmed_' + i + '" ' + (med.requireMedia ? 'checked' : '') + '><label>' + t('mediaOnly') + '</label></div>';
-  h += '<div class="field field-inline"><input type="checkbox" id="frt_' + i + '" ' + ((u.filters || {}).excludeRetweets ? 'checked' : '') + '><label>' + t('skipRT') + '</label></div>';
-  h += '<div class="field field-inline"><input type="checkbox" id="freply_' + i + '" ' + ((u.filters || {}).excludeReplies ? 'checked' : '') + '><label>' + t('skipReplies') + '</label></div>';
-  h += '</div>';
-  return h;
-}
-
-async function saveUserFilters(username, i) {
-  const filters = {
-    keywords: { include: getChips('arr_inc_' + i), exclude: getChips('arr_exc_' + i) },
-    media: { requireMedia: !!document.getElementById('fmed_' + i)?.checked },
-    excludeRetweets: !!document.getElementById('frt_' + i)?.checked,
-    excludeReplies: !!document.getElementById('freply_' + i)?.checked,
-  };
-  await api('/api/users/' + username, 'PUT', { filters });
-  toast(t('updatedUser') + username);
-  await loadConfig();
-}
-
-function toggleFilters(uname) {
-  const idx = config.users.indexOf(config.users.find(x => x.username === uname));
-  const el = document.getElementById('filters-' + idx);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-async function addUser() {
-  const uname = $('#new-username').value.trim();
-  const display = $('#new-display').value.trim();
-  if (!uname) { toast(t('usernameRequired'), 'error'); return; }
-  try {
-    await api('/api/users', 'POST', { username: uname, displayName: display || uname });
-    toast(t('addedUser') + uname);
-    await loadConfig();
-  } catch(e) { toast(e.message, 'error'); }
-}
-
-async function removeUser(username) {
-  if (!confirm(t('confirmRemove') + username + t('confirmRemoveSuffix'))) return;
-  await api('/api/users/' + username, 'DELETE');
-  toast(t('removedUser') + username);
-  await loadConfig();
 }
 
 function renderUsers() {
@@ -1381,7 +1327,12 @@ function updateNavLabels() {
     if (badge) n.appendChild(badge);
   });
   const badge = document.getElementById('nav-user-count');
-  if (badge) badge.textContent = config ? config.users.length : 0;
+  if (badge) {
+    const groups = config?.groups || [];
+    const s = new Set();
+    groups.forEach(g => (g.users || []).forEach(u => s.add(u.username)));
+    badge.textContent = s.size;
+  }
   const sidebarLabel = document.querySelector('.sidebar-label');
   if (sidebarLabel) sidebarLabel.textContent = t('menu');
   const subtitle = document.querySelector('.logo span');
