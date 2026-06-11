@@ -594,7 +594,52 @@
   .ftag.on { color: var(--green); background: var(--green-soft); border-color: rgba(0,230,118,0.2); }
   .ftag.off { color: var(--red); background: var(--red-soft); border-color: rgba(255,77,106,0.2); }
 
-  /* ── Config cards ───────────────── */
+/* ── User filters ────────────────── */
+
+function toggleUserFilters(username) {
+  const uid = 'u_' + username.replace(/[^a-zA-Z0-9]/g, '_');
+  const el = document.getElementById(uid + '_box');
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveUserFilters(username) {
+  const uid = 'u_' + username.replace(/[^a-zA-Z0-9]/g, '_');
+  const filters = {
+    keywords: {
+      include: getChips(uid + '_inc'),
+      exclude: getChips(uid + '_exc'),
+    },
+    media: { requireMedia: !!document.getElementById(uid + '_med')?.checked },
+    excludeRetweets: !!document.getElementById(uid + '_rt')?.checked,
+    excludeReplies: !!document.getElementById(uid + '_reply')?.checked,
+  };
+
+  const groups = config.groups || [];
+  let updated = 0;
+
+  for (const g of groups) {
+    const users = g.users || [];
+    const idx = users.findIndex(u => u.username === username);
+    if (idx === -1) continue;
+
+    const updatedUsers = users.map((u, i) => {
+      if (i === idx) return { ...u, filters };
+      return u;
+    });
+
+    await api('/api/groups/' + g.name, 'PUT', { users: updatedUsers });
+    updated++;
+  }
+
+  if (updated > 0) {
+    toast(t('updatedUser') + username);
+    await loadConfig();
+  } else {
+    toast('User not found in any group', 'error');
+  }
+}
+
+/* ── Config cards ───────────────── */
 
   .cards-grid {
     display: grid;
@@ -1170,6 +1215,7 @@ function renderUsers() {
 
   users.forEach(u => {
     const f = u.filters || {}, kw = f.keywords || {}, med = f.media || {};
+    const uid = 'u_' + u.username.replace(/[^a-zA-Z0-9]/g, '_');
     h += '<div class="user-card-grid">';
     h += '<div class="uc-header">';
     h += '<div class="uc-avatar">' +
@@ -1196,6 +1242,25 @@ function renderUsers() {
     h += '<span class="ftag ' + (f.excludeRetweets ? 'off' : '') + '">' + (f.excludeRetweets ? t('noRT') : t('withRT')) + '</span>';
     h += '<span class="ftag ' + (f.excludeReplies ? 'off' : '') + '">' + (f.excludeReplies ? t('noReplies') : t('withReplies')) + '</span>';
     h += '</div>';
+
+    h += '<button class="btn btn-ghost btn-sm" onclick="toggleUserFilters(\'' + u.username + '\')" style="margin-top:8px;font-family:var(--font-mono);font-size:10px">' + t('editFilters') + '</button>';
+    h += '<div id="' + uid + '_box" class="user-filters-box" style="display:none;margin-top:10px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm)">';
+    h += '<div class="field-row">';
+    h += '<div class="field"><label style="font-size:10px">' + t('includeKw') + '</label><div class="chip-array" id="' + uid + '_inc">';
+    (kw.include || []).forEach(k => h += '<span class="chip">' + k + '<span class="rm" onclick="this.parentElement.remove()">×</span></span>');
+    h += '<input onkeydown="addChip(event, this, \'' + uid + '_inc\')" placeholder="' + t('addKw') + '"></div></div>';
+    h += '<div class="field"><label style="font-size:10px">' + t('excludeKw') + '</label><div class="chip-array" id="' + uid + '_exc">';
+    (kw.exclude || []).forEach(k => h += '<span class="chip">' + k + '<span class="rm" onclick="this.parentElement.remove()">×</span></span>');
+    h += '<input onkeydown="addChip(event, this, \'' + uid + '_exc\')" placeholder="' + t('addKw') + '"></div></div>';
+    h += '</div>';
+    h += '<div class="field-row-3" style="margin-top:10px">';
+    h += '<div class="field field-inline"><input type="checkbox" id="' + uid + '_med" ' + (med.requireMedia ? 'checked' : '') + '><label>' + t('mediaOnly') + '</label></div>';
+    h += '<div class="field field-inline"><input type="checkbox" id="' + uid + '_rt" ' + (f.excludeRetweets ? 'checked' : '') + '><label>' + t('skipRT') + '</label></div>';
+    h += '<div class="field field-inline"><input type="checkbox" id="' + uid + '_reply" ' + (f.excludeReplies ? 'checked' : '') + '><label>' + t('skipReplies') + '</label></div>';
+    h += '</div>';
+    h += '<button class="btn btn-primary btn-sm" onclick="saveUserFilters(\'' + u.username + '\')" style="margin-top:10px">' + t('save') + '</button>';
+    h += '</div>';
+
     h += '</div>';
   });
 
