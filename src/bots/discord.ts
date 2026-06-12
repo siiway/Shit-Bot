@@ -68,10 +68,11 @@ export async function sendToDiscord(tweet: ProcessedTweet, channelId?: string, a
   try {
     let sentMessage: Message;
 
-    if (sendImage) {
-      const imageBuffer = preRenderedImage || await renderTweetImage(tweet);
-      if (imageBuffer) {
-        const attachment = new AttachmentBuilder(imageBuffer, { name: `tweet_${tweet.id}.png` });
+        if (sendImage) {
+            const imageBuffer = preRenderedImage || await renderTweetImage(tweet);
+            if (imageBuffer) {
+                const buf = Buffer.from(imageBuffer);
+                const attachment = new AttachmentBuilder(buf, { name: `tweet_${tweet.id}.png` });
         const embed = new EmbedBuilder()
           .setAuthor({ name: `@${tweet.author}`, url: `https://x.com/${tweet.author}` })
           .setDescription(`[🔗 View on X](${tweet.url})`)
