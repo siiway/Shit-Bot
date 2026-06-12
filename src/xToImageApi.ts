@@ -9,7 +9,7 @@ async function fetchWithRetry(url: string, headers: Record<string, string>, twee
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(url, { headers, verbose: true });
+      const response = await fetch(url, { headers });
       return response;
     } catch (error) {
       lastError = error;

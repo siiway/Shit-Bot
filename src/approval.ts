@@ -198,7 +198,7 @@ async function dispatchGroupDirect(
     promises.push(
       withTimeoutResult(
         sendToTelegram(tweet, group.telegram.chatId, true, imageBuf).then(Boolean),
-        20000,
+        90000,
         `${group.name}/Telegram/main`,
         results,
       ),
@@ -207,7 +207,7 @@ async function dispatchGroupDirect(
       promises.push(
         withTimeoutResult(
           sendToTelegram(tweet, target.chatId, true, imageBuf).then(Boolean),
-          20000,
+          90000,
           `${group.name}/Telegram/${tag}`,
           results,
         ),
@@ -219,7 +219,7 @@ async function dispatchGroupDirect(
     promises.push(
       withTimeoutResult(
         sendToDiscord(tweet, group.discord.channelId, true, imageBuf).then((m) => !!m),
-        20000,
+        90000,
         `${group.name}/Discord`,
         results,
       ),
@@ -617,7 +617,7 @@ async function dispatchToTargets(pending: PendingApproval, targetTag?: string): 
     promises.push(
       withTimeoutResult(
         sendToDiscord(pending.tweet, group.discord.r14ChannelId, true, imageBuf).then((m) => !!m),
-        20000,
+        90000,
         `${pending.groupName}/Discord/R14`,
         results,
       ),
@@ -632,7 +632,7 @@ async function dispatchToTargets(pending: PendingApproval, targetTag?: string): 
     promises.push(
       withTimeoutResult(
         sendToTelegram(pending.tweet, targetChatId, true, imageBuf).then(Boolean),
-        20000,
+        90000,
         `${pending.groupName}/Telegram/${targetTag}`,
         results,
       ),
@@ -649,7 +649,7 @@ async function dispatchToTargets(pending: PendingApproval, targetTag?: string): 
         promises.push(
           withTimeoutResult(
             sendToTelegram(pending.tweet, group.telegram.chatId, true, imageBuf).then(Boolean),
-            20000,
+            90000,
             `${pending.groupName}/Telegram/main`,
             results,
           ),
@@ -664,7 +664,7 @@ async function dispatchToTargets(pending: PendingApproval, targetTag?: string): 
         promises.push(
           withTimeoutResult(
             sendToTelegram(pending.tweet, target.chatId, true, imageBuf).then(Boolean),
-            20000,
+            90000,
             `${pending.groupName}/Telegram/${tag}`,
             results,
           ),
@@ -679,7 +679,7 @@ async function dispatchToTargets(pending: PendingApproval, targetTag?: string): 
         promises.push(
           withTimeoutResult(
             sendToDiscord(pending.tweet, group.discord.channelId, true, imageBuf).then((m) => !!m),
-            20000,
+            90000,
             `${pending.groupName}/Discord`,
             results,
           ),
@@ -1217,13 +1217,13 @@ export async function sendToAllGroups(tweet: ProcessedTweet): Promise<void> {
     if (group.telegram && config.telegram.enabled) {
       withTimeout(
         sendToTelegram(tweet, group.telegram.chatId, true, imageBuf).then(Boolean),
-        20000,
+        90000,
         `${group.name}/Telegram/main`,
       );
       for (const [tag, target] of Object.entries(group.telegram.targets || {})) {
         withTimeout(
           sendToTelegram(tweet, target.chatId, true, imageBuf).then(Boolean),
-          20000,
+          90000,
           `${group.name}/Telegram/${tag}`,
         );
       }
@@ -1232,7 +1232,7 @@ export async function sendToAllGroups(tweet: ProcessedTweet): Promise<void> {
     if (group.discord && config.discord.enabled) {
       withTimeout(
         sendToDiscord(tweet, group.discord.channelId, true, imageBuf).then(Boolean),
-        20000,
+        90000,
         `${group.name}/Discord`,
       );
     }

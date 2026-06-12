@@ -8,6 +8,21 @@ import { storeSentMessage, getRecentSentMessages, deleteSentMessage, getSentMess
 let client: Client | null = null;
 let targetChannel: TextChannel | null = null;
 
+function callWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number = 15000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('请求超时')), timeoutMs);
+    fn()
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export function getDiscordClient(): Client | null {
   return client;
 }
@@ -66,13 +81,13 @@ export async function sendToDiscord(tweet: ProcessedTweet, channelId?: string, a
   }
 
   try {
-    let sentMessage: Message;
+    let sentMessage: Message | null;
 
-        if (sendImage) {
-            const imageBuffer = preRenderedImage || await renderTweetImage(tweet);
-            if (imageBuffer) {
-                const buf = Buffer.from(imageBuffer);
-                const attachment = new AttachmentBuilder(buf, { name: `tweet_${tweet.id}.png` });
+    if (sendImage) {
+      const imageBuffer = preRenderedImage || await renderTweetImage(tweet);
+      if (imageBuffer) {
+        const buf = Buffer.from(imageBuffer);
+        const attachment = new AttachmentBuilder(buf, { name: `tweet_${tweet.id}.png` });
         const embed = new EmbedBuilder()
           .setAuthor({ name: `@${tweet.author}`, url: `https://x.com/${tweet.author}` })
           .setDescription(`[🔗 在 X 上查看](${tweet.url})`)
@@ -81,10 +96,12 @@ export async function sendToDiscord(tweet: ProcessedTweet, channelId?: string, a
           .setColor((config.discord.embedColor || '#1DA1F2') as `#${string}`)
           .setTimestamp(tweet.publishedAt);
 
-        sentMessage = await sendTo.send({ embeds: [embed], files: [attachment] });
-        storeSentMessage(sendTo.id, sentMessage.id, tweet.id);
-        console.log(`[Discord] 以图片形式发送推文 ${tweet.id}${channelId ? ` (${channelId})` : ""}`);
-        return sentMessage;
+        sentMessage = await sendWithRetry(sendTo, { embeds: [embed], files: [attachment] }, tweet.id);
+        if (sentMessage) {
+          storeSentMessage(sendTo.id, sentMessage.id, tweet.id);
+          console.log(`[Discord] 以图片形式发送推文 ${tweet.id}${channelId ? ` (${channelId})` : ""}`);
+          return sentMessage;
+        }
       }
     }
 
@@ -101,14 +118,34 @@ export async function sendToDiscord(tweet: ProcessedTweet, channelId?: string, a
 
     embed.setFooter({ text: `${tweet.mediaUrls.length} 个媒体附件` });
 
-    sentMessage = await sendTo.send({ embeds: [embed] });
-    storeSentMessage(sendTo.id, sentMessage.id, tweet.id);
-    console.log(`[Discord] 发送推文 ${tweet.id}${channelId ? ` (${channelId})` : ""}`);
-    return sentMessage;
+    sentMessage = await sendWithRetry(sendTo, { embeds: [embed] }, tweet.id);
+    if (sentMessage) {
+      storeSentMessage(sendTo.id, sentMessage.id, tweet.id);
+      console.log(`[Discord] 发送推文 ${tweet.id}${channelId ? ` (${channelId})` : ""}`);
+      return sentMessage;
+    }
+
+    console.error(`[Discord] 推文 ${tweet.id} 发送失败, 所有重试均未成功`);
+    return null;
   } catch (error) {
     console.error(`[Discord] 发送推文 ${tweet.id} 失败:`, error);
     return null;
   }
+}
+
+async function sendWithRetry(channel: TextChannel, payload: { embeds: EmbedBuilder[]; files?: AttachmentBuilder[] }, tweetId: string): Promise<Message | null> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const msg = await callWithTimeout(() => channel.send(payload), 15000);
+      return msg;
+    } catch (error) {
+      console.error(`[Discord] 发送尝试 ${attempt}/3 失败, 推文 ${tweetId}:`, (error as Error).message);
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 5000 * attempt));
+      }
+    }
+  }
+  return null;
 }
 
 export async function sendBatchToDiscord(tweets: ProcessedTweet[]): Promise<number> {
