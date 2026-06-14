@@ -93,6 +93,7 @@ export function loadConfig(configPath?: string): AppConfig {
       systemPrompt: rawConfig.ai?.systemPrompt || '你是一个有帮助的助手。',
       maxTokens: rawConfig.ai?.maxTokens ?? 1024,
       temperature: rawConfig.ai?.temperature ?? 0.7,
+      allowedGuildIds: rawConfig.ai?.allowedGuildIds ?? [],
     },
     webui: {
       enabled: rawConfig.webui?.enabled ?? true,

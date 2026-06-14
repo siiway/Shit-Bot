@@ -71,6 +71,7 @@ export interface AIConfig {
   systemPrompt: string;
   maxTokens: number;
   temperature: number;
+  allowedGuildIds?: string[];
 }
 
 export interface WebUIConfig {

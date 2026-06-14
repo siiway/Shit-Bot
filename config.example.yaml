@@ -33,6 +33,7 @@ ai:
   systemPrompt: "你是一个有帮助的助手。"
   maxTokens: 1024
   temperature: 0.7
+  allowedGuildIds: []
 
 enableApproval: true
 sendAsImage: true

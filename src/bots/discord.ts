@@ -293,6 +293,14 @@ export function initDiscordAiChat(): boolean {
 
     if (!botMentioned) return;
 
+    const allowedGuilds = getConfig().ai.allowedGuildIds;
+    if (allowedGuilds && allowedGuilds.length > 0) {
+      const guildId = message.guildId;
+      if (!guildId || !allowedGuilds.includes(guildId)) {
+        return;
+      }
+    }
+
     const content = message.content
       .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
       .trim();
