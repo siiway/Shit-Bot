@@ -1,6 +1,6 @@
 services:
   shit-bot:
-    build: .
+    image: ghcr.io/recloudstudio/shit-bot:latest
     container_name: shit-bot
     restart: unless-stopped
     ports:
