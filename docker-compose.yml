@@ -1,0 +1,12 @@
+services:
+  shit-bot:
+    build: .
+    container_name: shit-bot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai

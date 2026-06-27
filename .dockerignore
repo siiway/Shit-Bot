@@ -1,0 +1,13 @@
+node_modules/
+dist/
+data/
+.git/
+.gitignore
+*.md
+.env
+.env.example
+config.yaml
+config.json
+config.yml
+config.toml
+wrangler.jsonc
