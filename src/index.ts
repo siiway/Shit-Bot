@@ -3,7 +3,7 @@ import * as http from 'http';
 import { loadConfig, getConfig, getEffectiveGroups } from './config';
 import { fetchAllTweets } from './rss/fetcher';
 import { filterTweets, getPassedTweets } from './filters';
-import { initDiscord, shutdownDiscord, getDiscordClient, registerDiscordCommands, initDiscordAiChat } from './bots/discord';
+import { initDiscord, shutdownDiscord, getDiscordClient, registerDiscordCommands, initDiscordAiChat, handleMemoryCommand, handleDeleteMemoryCommand } from './bots/discord';
 import { initTelegram, shutdownTelegram, getTelegramBot } from './bots/telegram';
 import { initDatabase, closeDatabase, markMultipleAsSent, cleanupOldRecords, cleanupExpiredImages, cleanupOldSentMessages, cleanupOldSentTgMessages } from './storage';
 import { sendForApproval, sendToAllGroups, handleTelegramApproval, handleDiscordApproval, setTelegramBot, setDiscordClient, handleRecallCommand, handleRecallMessageContextMenu, handleTelegramRecall, handleDiscordRecall, rehydratePendingApprovals, cleanupExpiredApprovals } from './approval';
@@ -133,24 +133,28 @@ async function start(): Promise<void> {
     }
   }
 
-  console.log('正在初始化 Twitter 客户端...');
-  let twitterReady = await initTwitterClient();
+  if (config.twitter.enabled !== false) {
+    console.log('正在初始化 Twitter 客户端...');
+    let twitterReady = await initTwitterClient();
 
-  if (!twitterReady && config.twitter.username && config.twitter.password) {
-    console.log('Cookie 无效, 尝试使用凭据登录...');
-    try {
-      const result = await loginWithCredentials();
-      config.twitter.authToken = result.authToken;
-      config.twitter.ct0 = result.ct0;
-      twitterReady = await initTwitterClient();
-    } catch (error) {
-      console.error('登录失败:', error);
+    if (!twitterReady && config.twitter.username && config.twitter.password) {
+      console.log('Cookie 无效, 尝试使用凭据登录...');
+      try {
+        const result = await loginWithCredentials();
+        config.twitter.authToken = result.authToken;
+        config.twitter.ct0 = result.ct0;
+        twitterReady = await initTwitterClient();
+      } catch (error) {
+        console.error('登录失败:', error);
+      }
     }
-  }
 
-  if (!twitterReady) {
-    console.error('Twitter 客户端初始化失败, 退出程序.');
-    process.exit(1);
+    if (!twitterReady) {
+      console.error('Twitter 客户端初始化失败, 退出程序.');
+      process.exit(1);
+    }
+  } else {
+    console.log('Twitter 推文监控已禁用 (twitter.enabled: false)');
   }
 
   let discordReady = false;
@@ -200,6 +204,10 @@ async function start(): Promise<void> {
         if (interaction.isChatInputCommand()) {
           if (interaction.commandName === 'recall') {
             await handleRecallCommand(interaction);
+          } else if (interaction.commandName === 'memory') {
+            await handleMemoryCommand(interaction);
+          } else if (interaction.commandName === 'delete-memory') {
+            await handleDeleteMemoryCommand(interaction);
           }
           return;
         }
@@ -222,6 +230,13 @@ async function start(): Promise<void> {
     process.exit(1);
   }
 
+  webServer = startWebServer();
+
+  if (config.twitter.enabled === false) {
+    console.log('\n仅运行 AI 聊天 / WebUI (Twitter 推文监控已禁用)。');
+    return;
+  }
+
   const groups = getEffectiveGroups();
   const uniqueUsers = new Map<string, string>();
   for (const g of groups) {
@@ -236,7 +251,6 @@ async function start(): Promise<void> {
   }
 
   console.log(`\n轮询间隔: ${config.pollIntervalMinutes} 分钟`);
-  webServer = startWebServer();
   console.log('开始首次轮询...\n');
 
   await pollAndSend();
