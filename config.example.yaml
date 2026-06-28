@@ -12,6 +12,7 @@ telegram:
   apiRoot: ""
 
 twitter:
+  enabled: true          # 设为 false 可关闭推文监控, 只跑 AI 聊天 / WebUI
   authToken: ""
   ct0: ""
   username: ""
@@ -34,6 +35,25 @@ ai:
   maxTokens: 1024
   temperature: 0.7
   allowedGuildIds: []
+  maxToolIterations: 8
+  webSearch:
+    enabled: false
+    provider: duckduckgo   # duckduckgo | tavily | serper | brave | searxng
+    apiKey: ""             # tavily / serper / brave 需要
+    baseUrl: ""            # searxng 实例地址
+    maxResults: 5
+  memory:
+    enabled: false
+    maxProfileItems: 12      # 每轮强制注入的画像最多取几条(按权重)
+    maxProfileChars: 800     # 画像字符上限
+    recentTurns: 6           # 每轮自动附带的最近对话条数(连续性), 0 关闭
+    recallLimit: 8           # recall_memory 按需检索时每类返回的条数
+    logConversations: true
+    maxConversationsPerUser: 500
+  summary:
+    enabled: false              # @机器人 "总结一下上面的200条消息" 时生效
+    maxMessagesPerChannel: 500  # 每个频道滚动保留的消息数(也是可总结的上限)
+    defaultCount: 100           # 未指定条数时默认总结多少条
 
 enableApproval: true
 sendAsImage: true

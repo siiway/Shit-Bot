@@ -91,6 +91,7 @@ export function loadConfig(configPath?: string): AppConfig {
       token: process.env.TELEGRAM_TOKEN || rawConfig.telegram?.token,
     },
     twitter: {
+      enabled: rawConfig.twitter?.enabled ?? true,
       authToken: process.env.TWITTER_AUTH_TOKEN || rawConfig.twitter?.authToken || '',
       ct0: process.env.TWITTER_CT0 || rawConfig.twitter?.ct0 || '',
       username: process.env.TWITTER_USERNAME || rawConfig.twitter?.username,
@@ -107,6 +108,28 @@ export function loadConfig(configPath?: string): AppConfig {
       maxTokens: rawConfig.ai?.maxTokens ?? 1024,
       temperature: rawConfig.ai?.temperature ?? 0.7,
       allowedGuildIds: rawConfig.ai?.allowedGuildIds ?? [],
+      maxToolIterations: rawConfig.ai?.maxToolIterations ?? 8,
+      webSearch: {
+        enabled: rawConfig.ai?.webSearch?.enabled ?? false,
+        provider: rawConfig.ai?.webSearch?.provider || 'duckduckgo',
+        apiKey: process.env.AI_WEB_SEARCH_API_KEY || rawConfig.ai?.webSearch?.apiKey || '',
+        baseUrl: rawConfig.ai?.webSearch?.baseUrl || '',
+        maxResults: rawConfig.ai?.webSearch?.maxResults ?? 5,
+      },
+      memory: {
+        enabled: rawConfig.ai?.memory?.enabled ?? false,
+        maxProfileItems: rawConfig.ai?.memory?.maxProfileItems ?? 12,
+        maxProfileChars: rawConfig.ai?.memory?.maxProfileChars ?? 800,
+        recentTurns: rawConfig.ai?.memory?.recentTurns ?? 6,
+        recallLimit: rawConfig.ai?.memory?.recallLimit ?? 8,
+        logConversations: rawConfig.ai?.memory?.logConversations ?? true,
+        maxConversationsPerUser: rawConfig.ai?.memory?.maxConversationsPerUser ?? 500,
+      },
+      summary: {
+        enabled: rawConfig.ai?.summary?.enabled ?? false,
+        maxMessagesPerChannel: rawConfig.ai?.summary?.maxMessagesPerChannel ?? 500,
+        defaultCount: rawConfig.ai?.summary?.defaultCount ?? 100,
+      },
     },
     webui: {
       enabled: rawConfig.webui?.enabled ?? true,
@@ -126,42 +149,46 @@ export function loadConfig(configPath?: string): AppConfig {
 }
 
 function validateConfig(cfg: AppConfig): void {
+  const twitterEnabled = cfg.twitter.enabled !== false;
+
   if (!cfg.groups || cfg.groups.length === 0) {
-    throw new Error('未配置群组, 至少需要一个包含用户的群组。');
-  }
-
-  let hasAnyUser = false;
-  const names = new Set<string>();
-
-  for (const g of cfg.groups) {
-    if (!g.name) {
-      throw new Error('每个群组必须有名称');
+    if (twitterEnabled) {
+      throw new Error('未配置群组, 至少需要一个包含用户的群组。');
     }
-    if (names.has(g.name)) {
-      throw new Error(`群组名称重复: ${g.name}`);
-    }
-    names.add(g.name);
+  } else {
+    let hasAnyUser = false;
+    const names = new Set<string>();
 
-    if (g.users && g.users.length > 0) {
-      hasAnyUser = true;
+    for (const g of cfg.groups) {
+      if (!g.name) {
+        throw new Error('每个群组必须有名称');
+      }
+      if (names.has(g.name)) {
+        throw new Error(`群组名称重复: ${g.name}`);
+      }
+      names.add(g.name);
+
+      if (g.users && g.users.length > 0) {
+        hasAnyUser = true;
+      }
+
+      if (g.telegram && !g.telegram.chatId) {
+        throw new Error(`Group "${g.name}" has telegram config but no chatId`);
+      }
+      if (g.discord && !g.discord.channelId) {
+        throw new Error(`Group "${g.name}" has discord config but no channelId`);
+      }
     }
 
-    if (g.telegram && !g.telegram.chatId) {
-      throw new Error(`Group "${g.name}" has telegram config but no chatId`);
+    if (twitterEnabled && !hasAnyUser) {
+      throw new Error('At least one group must have users configured');
     }
-    if (g.discord && !g.discord.channelId) {
-      throw new Error(`Group "${g.name}" has discord config but no channelId`);
+
+    const hasWildcardGroup = cfg.groups.some(g => g.users?.some(u => u.username === '*'));
+    const hasDefaultUsers = (cfg.users || []).length > 0;
+    if (twitterEnabled && hasWildcardGroup && !hasDefaultUsers) {
+      throw new Error('Groups use wildcard "*" but no top-level users are configured');
     }
-  }
-
-  if (!hasAnyUser) {
-    throw new Error('At least one group must have users configured');
-  }
-
-  const hasWildcardGroup = cfg.groups.some(g => g.users?.some(u => u.username === '*'));
-  const hasDefaultUsers = (cfg.users || []).length > 0;
-  if (hasWildcardGroup && !hasDefaultUsers) {
-    throw new Error('Groups use wildcard "*" but no top-level users are configured');
   }
 
   if (cfg.discord.enabled) {

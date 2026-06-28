@@ -55,12 +55,37 @@ export interface TelegramConfig {
 }
 
 export interface TwitterConfig {
+  enabled?: boolean;
   authToken: string;
   ct0: string;
   username?: string;
   password?: string;
   email?: string;
   totpSecret?: string;
+}
+
+export interface AIWebSearchConfig {
+  enabled: boolean;
+  provider?: 'duckduckgo' | 'tavily' | 'serper' | 'searxng' | 'brave';
+  apiKey?: string;
+  baseUrl?: string;
+  maxResults?: number;
+}
+
+export interface AISummaryConfig {
+  enabled: boolean;
+  maxMessagesPerChannel?: number;
+  defaultCount?: number;
+}
+
+export interface AIMemoryConfig {
+  enabled: boolean;
+  maxProfileItems?: number;
+  maxProfileChars?: number;
+  recentTurns?: number;
+  recallLimit?: number;
+  logConversations?: boolean;
+  maxConversationsPerUser?: number;
 }
 
 export interface AIConfig {
@@ -72,6 +97,10 @@ export interface AIConfig {
   maxTokens: number;
   temperature: number;
   allowedGuildIds?: string[];
+  maxToolIterations?: number;
+  webSearch?: AIWebSearchConfig;
+  memory?: AIMemoryConfig;
+  summary?: AISummaryConfig;
 }
 
 export interface WebUIConfig {
