@@ -359,8 +359,9 @@ export function initDiscordAiChat(): boolean {
       .trim();
 
     let imageUrls = extractImageUrls(message);
+    const bareMention = !content && imageUrls.length === 0 && !message.reference?.messageId;
 
-    if (!content && imageUrls.length === 0 && !message.reference?.messageId) {
+    if (bareMention && !getConfig().ai.summary?.enabled) {
       try {
         await message.reply('你好！请 @我 然后输入你的问题，我会尽力回答。');
       } catch (e) {
@@ -411,6 +412,7 @@ export function initDiscordAiChat(): boolean {
         channelId: message.channelId,
         messageId: message.id,
         images: imageUrls.length ? imageUrls : undefined,
+        bareMention,
         backfillChannel: summaryEnabled && channel.isTextBased()
           ? (target: number) => backfillChannelHistory(channel as TextChannel, message.channelId, target)
           : undefined,

@@ -40,6 +40,7 @@ export interface ChatContext {
   channelId?: string;
   messageId?: string;
   images?: string[];
+  bareMention?: boolean;
   backfillChannel?: (targetTotal: number) => Promise<void>;
 }
 
@@ -170,6 +171,16 @@ const REACTION_INSTRUCTION =
   '  · 宁缺毋滥：不要为了贴而贴、不要堆砌、不要与内容无关的装饰性表情；真要贴通常 1 个就够，最多别超过 2 个。\n' +
   '注意：只有最终回复才是这个 JSON；工具调用阶段照常，不要包成 JSON。';
 
+function bareMentionGuide(defaultCount: number): string {
+  return (
+    `用户直接 @ 了你，但没有提出具体问题。请这样处理：\n` +
+    `1) 先用 read_channel_history 读取本频道最近约 ${defaultCount} 条消息，了解大家正在聊什么；\n` +
+    `2) 若读到的内容不足以理解上下文（话题被截断、缺前因后果），再多读一些，每次约再多 ${defaultCount} 条，直到够用为止（别无止境地读）；\n` +
+    `3) 消息里若有链接，可用 open_url 打开了解；若有图片，可用 read_image 查看；\n` +
+    `4) 然后像一个正常参与者那样自然地接话或回应——给出有价值的看法、补充或顺着话题往下聊；不要反问"你想问什么"，也不要机械复述聊天记录。`
+  );
+}
+
 function sanitizeInline(s: string, max: number): string {
   return String(s || '')
     .replace(/\p{Cc}/gu, ' ')
@@ -190,6 +201,7 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
   const displayName = sanitizeInline(ctx?.displayName || username || '用户', 64) || '用户';
   const memoryOn = !!cfg.memory?.enabled && !!username;
   const reactionsOn = platform === 'discord' && cfg.reactions !== false;
+  const bareMention = !!ctx?.bareMention;
 
   const messages: ChatMessage[] = [{ role: 'system', content: cfg.systemPrompt }];
 
@@ -199,6 +211,10 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
 
   if (reactionsOn) {
     messages.push({ role: 'system', content: REACTION_INSTRUCTION });
+  }
+
+  if (bareMention) {
+    messages.push({ role: 'system', content: bareMentionGuide(cfg.summary?.defaultCount ?? 100) });
   }
 
   if (memoryOn) {
@@ -218,7 +234,8 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
     messages.push({ role: 'user', content: `以下是被引用的消息内容:\n${ctx.contextMessage}` });
   }
 
-  const userText = `[${displayName}]: ${userMessage}`;
+  const effMsg = bareMention ? '（我直接 @ 了你，没有具体问题，麻烦你看看情况自然地回应一下。）' : userMessage;
+  const userText = `[${displayName}]: ${effMsg}`;
   const images = (ctx?.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 6);
   if (images.length > 0) {
     const parts: ContentPart[] = [{ type: 'text', text: userText }];
@@ -229,7 +246,10 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
   }
 
   if (memoryOn) {
-    logConversation(platform, username, 'user', userMessage || (images.length ? '[发送了图片]' : ''));
+    const logText = bareMention
+      ? '[直接@机器人]'
+      : userMessage || (images.length ? '[发送了图片]' : '');
+    logConversation(platform, username, 'user', logText);
   }
 
   const tools = buildTools();
