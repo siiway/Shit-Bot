@@ -400,9 +400,10 @@ export function initDiscordAiChat(): boolean {
 
     const stopTyping = channel.isTextBased() ? startTyping(channel as TextChannel) : () => {};
 
-    let aiResponse: string;
+    let reply = '';
+    let reactions: string[] = [];
     try {
-      aiResponse = await chatWithAI(content, {
+      const res = await chatWithAI(content, {
         username: message.author.username,
         displayName,
         contextMessage,
@@ -414,12 +415,22 @@ export function initDiscordAiChat(): boolean {
           ? (target: number) => backfillChannelHistory(channel as TextChannel, message.channelId, target)
           : undefined,
       });
+      reply = res.reply;
+      reactions = res.reactions;
     } finally {
       stopTyping();
     }
 
-    await sendChunkedReply(message, aiResponse);
-    console.log(`[AI] 回复 ${message.author.username}: ${aiResponse.slice(0, 60).replace(/\s+/g, ' ')}...`);
+    for (const emoji of reactions) {
+      try {
+        await message.react(emoji);
+      } catch (e) {
+        console.warn(`[AI] 贴表情失败 (${emoji}):`, (e as Error).message);
+      }
+    }
+
+    await sendChunkedReply(message, reply);
+    console.log(`[AI] 回复 ${message.author.username}: ${reply.slice(0, 60).replace(/\s+/g, ' ')}...`);
   });
 
   console.log('Discord AI 聊天监听器已注册');

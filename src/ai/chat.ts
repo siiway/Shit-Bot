@@ -1,6 +1,7 @@
 import { getConfig } from '../config';
 import { buildTools, executeTool, OpenAITool, ToolContext } from './tools';
 import { buildProfile, logConversation, getRecentConversation } from './memory';
+import { parseReplyJson, salvageReply, ReplyPayload } from './reactions';
 
 interface ToolCall {
   id: string;
@@ -158,6 +159,9 @@ const NON_ANSWER = '抱歉，我这次没能整理出有效回答。可以换个
 const DISCORD_FORMAT =
   '输出只用 Discord 支持的 Markdown（**粗** *斜* __下划线__ ~~删除线~~ `代码` ```代码块``` > 引用 # 标题 - 列表 ||剧透|| [文字](链接)）。表格、图片、HTML、LaTeX 等不被渲染，尽量转成等价写法（如表格→列表或代码块），实在无法转换再原样保留。';
 
+const REACTION_INSTRUCTION =
+  '你最终面向用户的回复必须是一个 JSON 对象，且只输出这个 JSON（不要套代码块、不要任何额外文字）：{"reply": "<给用户看的话，用 Discord Markdown>", "reactions": ["<表情短码>", ...]}。reply 必填。reactions 选填：0 到数个表情短码（形如 :smile: :tada: :+1:，首尾带冒号），用于给用户这条消息贴上 emoji 反应；没有要贴的就给 []。注意：只有最终回复才是这个 JSON；工具调用阶段照常，不要包成 JSON。';
+
 function sanitizeInline(s: string, max: number): string {
   return String(s || '')
     .replace(/\p{Cc}/gu, ' ')
@@ -166,22 +170,27 @@ function sanitizeInline(s: string, max: number): string {
     .slice(0, max);
 }
 
-export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promise<string> {
+export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promise<ReplyPayload> {
   const cfg = getConfig().ai;
 
   if (!cfg.enabled || !cfg.apiKey) {
-    return 'AI 聊天功能未启用或未配置 API Key。';
+    return { reply: 'AI 聊天功能未启用或未配置 API Key。', reactions: [] };
   }
 
   const platform = ctx?.platform || 'discord';
   const username = ctx?.username?.trim() || '';
   const displayName = sanitizeInline(ctx?.displayName || username || '用户', 64) || '用户';
   const memoryOn = !!cfg.memory?.enabled && !!username;
+  const reactionsOn = platform === 'discord' && cfg.reactions !== false;
 
   const messages: ChatMessage[] = [{ role: 'system', content: cfg.systemPrompt }];
 
   if (platform === 'discord') {
     messages.push({ role: 'system', content: DISCORD_FORMAT });
+  }
+
+  if (reactionsOn) {
+    messages.push({ role: 'system', content: REACTION_INSTRUCTION });
   }
 
   if (memoryOn) {
@@ -235,6 +244,7 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
 
   try {
     let finalText = '';
+    let finalFinishReason = '';
 
     for (let iter = 0; iter < maxIterations; iter++) {
       const lastIter = iter === maxIterations - 1;
@@ -309,9 +319,7 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
       }
 
       finalText = (msg.content || '').trim();
-      if (finalText && finishReason === 'length') {
-        finalText += '\n\n（回复因长度上限被截断，可回复"继续"获取后续）';
-      }
+      finalFinishReason = finishReason;
       if (!finalText) {
         console.warn(`[AI] 本轮返回空文本 (finish_reason=${finishReason || 'n/a'}, tool_calls=${toolCalls.length}, lastIter=${lastIter})`);
       }
@@ -327,6 +335,7 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
       try {
         const data = await callApi(messages, tools, false, escalated);
         finalText = (data.choices?.[0]?.message?.content || '').trim();
+        finalFinishReason = data.choices?.[0]?.finish_reason || '';
         if (!finalText) {
           console.warn(`[AI] 收尾(去掉工具)仍为空 (finish_reason=${data.choices?.[0]?.finish_reason || 'n/a'})`);
         }
@@ -338,22 +347,61 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
       }
     }
 
-    if (memoryOn && finalText && finalText !== NON_ANSWER) {
-      logConversation(platform, username, 'assistant', finalText);
+    let reply = finalText;
+    let reactions: string[] = [];
+
+    if (reactionsOn && finalText && finalText !== NON_ANSWER) {
+      let parsed = parseReplyJson(finalText);
+      // 非法 JSON 且不是被截断 -> 要求模型重新生成 (最多 2 次)
+      if (!parsed && finalFinishReason !== 'length') {
+        for (let r = 0; r < 2 && !parsed; r++) {
+          console.warn('[AI] 最终回复不是合法 JSON，要求重新生成');
+          messages.push({
+            role: 'user',
+            content:
+              '你刚才的回复不是合法 JSON。请只输出 {"reply":"...","reactions":[":short_code:", ...]} 这个 JSON，不要代码块、不要任何额外文字。重新输出。',
+          });
+          try {
+            const d = await callApi(messages, tools, false);
+            const t = (d.choices?.[0]?.message?.content || '').trim();
+            messages.push({ role: 'assistant', content: t });
+            finalFinishReason = d.choices?.[0]?.finish_reason || '';
+            parsed = parseReplyJson(t);
+          } catch (e) {
+            console.warn('[AI] 重新生成失败:', (e as Error).message);
+            break;
+          }
+        }
+      }
+      if (parsed) {
+        reply = parsed.reply;
+        reactions = parsed.reactions;
+      } else {
+        // 截断或重试仍失败: 尽量从原始内容里抢救出 reply 文本
+        reply = salvageReply(finalText);
+      }
     }
 
-    return finalText;
+    if (finalFinishReason === 'length' && reply) {
+      reply += '\n\n（回复因长度上限被截断，可回复"继续"获取后续）';
+    }
+
+    if (memoryOn && reply && reply !== NON_ANSWER) {
+      logConversation(platform, username, 'assistant', reply);
+    }
+
+    return { reply, reactions };
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
       console.error('AI API 请求超时');
-      return 'AI 响应超时，请稍后再试。';
+      return { reply: 'AI 响应超时，请稍后再试。', reactions: [] };
     }
     const err = error as Error & { status?: number };
     console.error('AI API 请求失败:', err.message);
     if (err.status) {
-      return `AI 服务返回错误 (${err.status})。请检查 API 配置。`;
+      return { reply: `AI 服务返回错误 (${err.status})。请检查 API 配置。`, reactions: [] };
     }
-    return 'AI 服务请求失败，请检查 API 配置或稍后再试。';
+    return { reply: 'AI 服务请求失败，请检查 API 配置或稍后再试。', reactions: [] };
   }
 }
 

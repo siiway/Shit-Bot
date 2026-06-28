@@ -98,6 +98,7 @@ export interface AIConfig {
   temperature: number;
   allowedGuildIds?: string[];
   maxToolIterations?: number;
+  reactions?: boolean;
   webSearch?: AIWebSearchConfig;
   memory?: AIMemoryConfig;
   summary?: AISummaryConfig;

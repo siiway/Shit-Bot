@@ -36,6 +36,7 @@ ai:
   temperature: 0.7
   allowedGuildIds: []
   maxToolIterations: 8
+  reactions: true          # 让模型在最终回复里返回 emoji 短码, 给用户消息贴表情反应
   webSearch:
     enabled: false
     provider: duckduckgo   # duckduckgo | tavily | serper | brave | searxng

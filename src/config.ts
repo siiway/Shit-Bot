@@ -109,6 +109,7 @@ export function loadConfig(configPath?: string): AppConfig {
       temperature: rawConfig.ai?.temperature ?? 0.7,
       allowedGuildIds: rawConfig.ai?.allowedGuildIds ?? [],
       maxToolIterations: rawConfig.ai?.maxToolIterations ?? 8,
+      reactions: rawConfig.ai?.reactions ?? true,
       webSearch: {
         enabled: rawConfig.ai?.webSearch?.enabled ?? false,
         provider: rawConfig.ai?.webSearch?.provider || 'duckduckgo',
