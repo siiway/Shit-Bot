@@ -358,7 +358,9 @@ export function initDiscordAiChat(): boolean {
       .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
       .trim();
 
-    if (!content) {
+    let imageUrls = extractImageUrls(message);
+
+    if (!content && imageUrls.length === 0 && !message.reference?.messageId) {
       try {
         await message.reply('你好！请 @我 然后输入你的问题，我会尽力回答。');
       } catch (e) {
@@ -377,6 +379,8 @@ export function initDiscordAiChat(): boolean {
             const refContent = refMsg.content.slice(0, 2000);
             contextMessage = `[${refAuthor}]: ${refContent}`;
             console.log(`[AI] 获取到引用消息 (${refAuthor}): ${refContent.slice(0, 80)}...`);
+            const refImgs = extractImageUrls(refMsg);
+            if (refImgs.length) imageUrls = [...imageUrls, ...refImgs].slice(0, 6);
           }
         }
       } catch (e) {
@@ -405,6 +409,7 @@ export function initDiscordAiChat(): boolean {
         platform: 'discord',
         channelId: message.channelId,
         messageId: message.id,
+        images: imageUrls.length ? imageUrls : undefined,
         backfillChannel: summaryEnabled && channel.isTextBased()
           ? (target: number) => backfillChannelHistory(channel as TextChannel, message.channelId, target)
           : undefined,
@@ -465,6 +470,19 @@ async function backfillChannelHistory(
   }
 
   console.log(`[AI] 频道 ${channelId} 历史补全至 ${have} 条 (目标 ${targetTotal})`);
+}
+
+function extractImageUrls(message: Message): string[] {
+  const urls: string[] = [];
+  for (const att of message.attachments.values()) {
+    const ct = att.contentType?.toLowerCase() || '';
+    const supported = ct
+      ? ct === 'image/png' || ct === 'image/jpeg' || ct === 'image/webp'
+      : /\.(png|jpe?g|webp)$/i.test(att.name || '');
+    if (supported && att.url && (att.size ?? 0) <= 10 * 1024 * 1024) urls.push(att.url);
+    if (urls.length >= 6) break;
+  }
+  return urls;
 }
 
 function startTyping(channel: TextChannel): () => void {

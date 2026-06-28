@@ -8,9 +8,13 @@ interface ToolCall {
   function: { name: string; arguments: string };
 }
 
+type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | ContentPart[] | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -34,6 +38,7 @@ export interface ChatContext {
   platform?: string;
   channelId?: string;
   messageId?: string;
+  images?: string[];
   backfillChannel?: (targetTotal: number) => Promise<void>;
 }
 
@@ -129,6 +134,21 @@ function stripToolMessages(messages: ChatMessage[]): void {
   }
 }
 
+function messagesHaveImages(messages: ChatMessage[]): boolean {
+  return messages.some((m) => Array.isArray(m.content));
+}
+
+function stripImageParts(messages: ChatMessage[]): void {
+  for (const m of messages) {
+    if (Array.isArray(m.content)) {
+      m.content = m.content
+        .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+        .map((p) => p.text)
+        .join('\n');
+    }
+  }
+}
+
 const NON_ANSWER = '抱歉，我这次没能整理出有效回答。可以换个问法，或直接把要我看的链接发给我。';
 
 const DISCORD_FORMAT =
@@ -174,12 +194,25 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
     messages.push({ role: 'user', content: `以下是被引用的消息内容:\n${ctx.contextMessage}` });
   }
 
-  messages.push({ role: 'user', content: `[${displayName}]: ${userMessage}` });
+  const userText = `[${displayName}]: ${userMessage}`;
+  const images = (ctx?.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 6);
+  if (images.length > 0) {
+    const parts: ContentPart[] = [{ type: 'text', text: userText }];
+    for (const url of images) parts.push({ type: 'image_url', image_url: { url } });
+    messages.push({ role: 'user', content: parts });
+  } else {
+    messages.push({ role: 'user', content: userText });
+  }
 
-  if (memoryOn) logConversation(platform, username, 'user', userMessage);
+  if (memoryOn) {
+    logConversation(platform, username, 'user', userMessage || (images.length ? '[发送了图片]' : ''));
+  }
 
   const tools = buildTools();
-  const maxIterations = Math.max(1, cfg.maxToolIterations ?? 5);
+  const maxIterations = Math.max(
+    1,
+    images.length ? Math.min(cfg.maxToolIterations ?? 5, 3) : cfg.maxToolIterations ?? 5
+  );
   const toolCtx: ToolContext = {
     platform,
     username,
@@ -216,6 +249,14 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
           } catch {
             finalText = '抱歉，当前模型不支持工具调用，请在配置中关闭联网搜索/记忆，或换用支持工具的模型。';
             break;
+          }
+        } else if (err.status === 400 && messagesHaveImages(messages)) {
+          console.warn('[AI] 图片请求被拒(400)，去掉图片重试纯文本');
+          stripImageParts(messages);
+          try {
+            data = await callApi(messages, tools, useTools ? (lastIter ? false : 'auto') : false);
+          } catch {
+            throw e;
           }
         } else {
           throw e;
