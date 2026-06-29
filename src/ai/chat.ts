@@ -109,20 +109,35 @@ async function callApi(
         const err = new Error(`HTTP ${response.status}: ${errorText}`) as Error & {
           status?: number;
           body?: string;
+          retryAfterMs?: number;
         };
         err.status = response.status;
         err.body = errorText;
+        const retryAfter = response.headers.get('retry-after');
+        if (retryAfter) {
+          const secs = Number(retryAfter);
+          if (Number.isFinite(secs) && secs >= 0) err.retryAfterMs = secs * 1000;
+        }
         throw err;
       }
 
       return (await response.json()) as ChatCompletionResponse;
     } catch (e) {
-      const err = e as Error & { status?: number };
-      const transient = (!err.status && err.name !== 'AbortError') || [502, 503, 504].includes(err.status || 0);
-      if (!transient || attempt >= maxAttempts) throw e;
+      const err = e as Error & { status?: number; retryAfterMs?: number };
+      const status = err.status || 0;
+      const isTimeout = err.name === 'AbortError';
+      // 可重试：网络层错误(无状态码)、请求超时、429 限流、408/5xx 服务端错误；
+      // 不重试：其它 4xx 客户端错误(400/401/403/404…)，重试无济于事，且 400 要留给上层特殊处理。
+      const retryable = !status || isTimeout || status === 408 || status === 429 || status >= 500;
+      // 超时每次都要干等满 60s 才中止，重试代价高、收益低(挂死的上游再试也基本不会成)，最多只重试 1 次；
+      // 其余瞬时错误代价小，仍按 maxAttempts 最多 3 次。
+      const attemptCap = isTimeout ? 2 : maxAttempts;
+      if (!retryable || attempt >= attemptCap) throw e;
       lastErr = e;
-      console.warn(`[AI] 网络瞬时错误，重试 ${attempt}/${maxAttempts - 1}: ${err.message}`);
-      await new Promise((r) => setTimeout(r, 600 * attempt));
+      const wait = Math.min(err.retryAfterMs ?? 600 * attempt, 10000);
+      const reason = isTimeout ? '请求超时' : err.message;
+      console.warn(`[AI] 瞬时错误，${wait}ms 后重试 ${attempt}/${attemptCap - 1}: ${reason}`);
+      await new Promise((r) => setTimeout(r, wait));
     } finally {
       clearTimeout(timeout);
     }
