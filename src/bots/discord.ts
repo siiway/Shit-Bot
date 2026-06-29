@@ -420,6 +420,10 @@ export function initDiscordAiChat(): boolean {
       });
       reply = res.reply;
       reactions = res.reactions;
+    } catch (e) {
+      // chatWithAI 正常不会抛(内部已兜底)，但万一抛出也要给用户一条兜底消息，绝不静默装死
+      console.error('[AI] chatWithAI 异常(兜底):', (e as Error).message);
+      reply = 'AI 暂时不可用，请稍后再试。';
     } finally {
       stopTyping();
     }

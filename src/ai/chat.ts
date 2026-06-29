@@ -69,6 +69,13 @@ function buildMemorySystemMessage(
   );
 }
 
+// 上游网关"拉取/下载图片失败"类错误的特征。这类错误是永久性的（图片直链对网关侧不可达，
+// 常被包装成 HTTP 500 convert_request_failed），重试无用，正确处理是去掉图片改用纯文本重试。
+function isImageFetchError(err: { status?: number; body?: string; message?: string }): boolean {
+  const s = `${err.body || ''} ${err.message || ''}`.toLowerCase();
+  return /get file data|file data from|download file|failed to download|convert_request_failed/.test(s);
+}
+
 async function callApi(
   messages: ChatMessage[],
   tools: OpenAITool[],
@@ -124,12 +131,14 @@ async function callApi(
 
       return (await response.json()) as ChatCompletionResponse;
     } catch (e) {
-      const err = e as Error & { status?: number; retryAfterMs?: number };
+      const err = e as Error & { status?: number; retryAfterMs?: number; body?: string };
       const status = err.status || 0;
       const isTimeout = err.name === 'AbortError';
       // 可重试：网络层错误(无状态码)、请求超时、429 限流、408/5xx 服务端错误；
-      // 不重试：其它 4xx 客户端错误(400/401/403/404…)，重试无济于事，且 400 要留给上层特殊处理。
-      const retryable = !status || isTimeout || status === 408 || status === 429 || status >= 500;
+      // 不重试：其它 4xx 客户端错误(400/401/403/404…)，以及"上游拉取图片失败"(永久性，要留给上层去图重试)。
+      const retryable =
+        (!status || isTimeout || status === 408 || status === 429 || status >= 500) &&
+        !isImageFetchError(err);
       // 超时每次都要干等满 60s 才中止，重试代价高、收益低(挂死的上游再试也基本不会成)，最多只重试 1 次；
       // 其余瞬时错误代价小，仍按 maxAttempts 最多 3 次。
       const attemptCap = isTimeout ? 2 : maxAttempts;
@@ -172,6 +181,9 @@ function stripImageParts(messages: ChatMessage[]): void {
 }
 
 const NON_ANSWER = '抱歉，我这次没能整理出有效回答。可以换个问法，或直接把要我看的链接发给我。';
+
+// 单条工具结果写入对话前的长度上限：防止超大页面/超多历史撑爆上下文、导致整条请求 400 硬失败
+const MAX_TOOL_RESULT = 16000;
 
 const DISCORD_FORMAT =
   '输出只用 Discord 支持的 Markdown（**粗** *斜* __下划线__ ~~删除线~~ `代码` ```代码块``` > 引用 # 标题 - 列表 ||剧透|| [文字](链接)）。表格、图片、HTML、LaTeX 等不被渲染，尽量转成等价写法（如表格→列表或代码块），实在无法转换再原样保留。';
@@ -243,18 +255,23 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
   }
 
   if (memoryOn) {
-    const injectRecent = !cfg.summary?.enabled;
-    const memMsg = buildMemorySystemMessage(platform, username, displayName, injectRecent);
-    if (memMsg) messages.push({ role: 'system', content: memMsg });
+    // 记忆/历史注入是锦上添花：DB 抖动时静默降级为"本轮不带记忆"，绝不阻断回复
+    try {
+      const injectRecent = !cfg.summary?.enabled;
+      const memMsg = buildMemorySystemMessage(platform, username, displayName, injectRecent);
+      if (memMsg) messages.push({ role: 'system', content: memMsg });
 
-    if (injectRecent) {
-      const recentTurns = cfg.memory?.recentTurns ?? 6;
-      for (const turn of getRecentConversation(platform, username, recentTurns)) {
-        messages.push({
-          role: turn.role,
-          content: `[${formatUtc8(turn.created_at)}] ${turn.content}`,
-        });
+      if (injectRecent) {
+        const recentTurns = cfg.memory?.recentTurns ?? 6;
+        for (const turn of getRecentConversation(platform, username, recentTurns)) {
+          messages.push({
+            role: turn.role,
+            content: `[${formatUtc8(turn.created_at)}] ${turn.content}`,
+          });
+        }
       }
+    } catch (e) {
+      console.warn('[AI] 注入记忆/历史失败(忽略，本轮不带记忆):', (e as Error).message);
     }
   }
 
@@ -274,10 +291,14 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
   }
 
   if (memoryOn) {
-    const logText = bareMention
-      ? '[直接@机器人]'
-      : userMessage || (images.length ? '[发送了图片]' : '');
-    logConversation(platform, username, 'user', logText);
+    try {
+      const logText = bareMention
+        ? '[直接@机器人]'
+        : userMessage || (images.length ? '[发送了图片]' : '');
+      logConversation(platform, username, 'user', logText);
+    } catch (e) {
+      console.warn('[AI] 记录用户消息到记忆失败(忽略):', (e as Error).message);
+    }
   }
 
   const tools = buildTools();
@@ -340,15 +361,25 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
             finalText = '抱歉，当前模型不支持工具调用，请在配置中关闭联网搜索/记忆，或换用支持工具的模型。';
             break;
           }
-        } else if (err.status === 400 && messagesHaveImages(messages)) {
-          console.warn('[AI] 图片请求被拒(400)，去掉图片重试纯文本');
+        } else if (messagesHaveImages(messages)) {
+          // 带图请求失败：一律先去掉图片用纯文本重试，绝不让单张图(失效/防盗链/被网关拒)终结整条回复
+          console.warn(
+            `[AI] 带图请求失败(${err.status ?? '?'}${isImageFetchError(err) ? '/上游拉取图片失败' : ''})，去掉图片改用纯文本重试`
+          );
           stripImageParts(messages);
           try {
             data = await callApi(messages, tools, useTools ? (lastIter ? false : 'auto') : false);
           } catch {
+            // 已有工具上下文则转入收尾(基于已查到的信息再答/兜底 NON_ANSWER)，否则才上抛
+            if (iter > 0) break;
             throw e;
           }
         } else {
+          // 中途瞬时失败但已积累工具结果：跳出去走收尾降级，不要让一轮抖动终结整条回复
+          if (iter > 0) {
+            console.warn(`[AI] 工具循环中途请求失败(${err.status ?? '?'})，转入收尾降级: ${err.message}`);
+            break;
+          }
           throw e;
         }
       }
@@ -381,11 +412,15 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
           const argStr = call.function?.arguments || '';
           console.log(`[AI] 工具调用: ${name} ${argStr.slice(0, 120)}`);
           const result = await executeTool(name, argStr, toolCtx);
+          const safeResult =
+            result.length > MAX_TOOL_RESULT
+              ? result.slice(0, MAX_TOOL_RESULT) + '\n…（工具结果过长，已截断）'
+              : result;
           messages.push({
             role: 'tool',
             tool_call_id: call.id,
             name,
-            content: result,
+            content: safeResult,
           });
         }
 
@@ -424,6 +459,17 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
         }
       } catch (e) {
         console.warn('[AI] 收尾(去掉工具)请求失败:', (e as Error).message);
+        if (messagesHaveImages(messages)) {
+          // 收尾这步也可能被坏图卡住：去掉图片再纯文本试一次，别直接给非答复
+          stripImageParts(messages);
+          try {
+            const d = await callApi(messages, tools, false, escalated);
+            finalText = (d.choices?.[0]?.message?.content || '').trim();
+            finalFinishReason = d.choices?.[0]?.finish_reason || '';
+          } catch (e2) {
+            console.warn('[AI] 收尾去图重试仍失败:', (e2 as Error).message);
+          }
+        }
       }
       if (!finalText) {
         finalText = NON_ANSWER;
@@ -477,9 +523,13 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
       replyTruncated = false;
     }
 
-    // 先把干净文本写进记忆，再给"发送用"的文本加截断提示
+    // 先把干净文本写进记忆，再给"发送用"的文本加截断提示。落库失败只告警，绝不丢弃已算好的回复
     if (memoryOn && reply !== NON_ANSWER) {
-      logConversation(platform, username, 'assistant', reply);
+      try {
+        logConversation(platform, username, 'assistant', reply);
+      } catch (e) {
+        console.warn('[AI] 记录回复到记忆失败(忽略):', (e as Error).message);
+      }
     }
 
     if (replyTruncated && reply !== NON_ANSWER) {
