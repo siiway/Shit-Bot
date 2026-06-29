@@ -2,6 +2,7 @@ import { getConfig } from '../config';
 import { buildTools, executeTool, OpenAITool, ToolContext } from './tools';
 import { buildProfile, logConversation, getRecentConversation } from './memory';
 import { parseReplyJson, salvageReply, ReplyPayload } from './reactions';
+import { formatUtc8, nowUtc8 } from './time';
 
 interface ToolCall {
   id: string;
@@ -220,6 +221,15 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
 
   const messages: ChatMessage[] = [{ role: 'system', content: cfg.systemPrompt }];
 
+  messages.push({
+    role: 'system',
+    content:
+      `当前时间：${nowUtc8()}（UTC+8，北京时间）。` +
+      `除非用户明确指明其它时区，默认所有时间都按 UTC+8 理解和表述；` +
+      `历史消息前若带有 [YYYY-MM-DD HH:mm:ss] 形式的时间戳，同样是 UTC+8。` +
+      `这些时间戳只是系统为帮助你判断消息发生时间而附加的标注，不属于消息正文；你自己回复时不要在开头添加任何这种 [时间] 前缀。`,
+  });
+
   if (platform === 'discord') {
     messages.push({ role: 'system', content: DISCORD_FORMAT });
   }
@@ -240,7 +250,10 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
     if (injectRecent) {
       const recentTurns = cfg.memory?.recentTurns ?? 6;
       for (const turn of getRecentConversation(platform, username, recentTurns)) {
-        messages.push({ role: turn.role, content: turn.content });
+        messages.push({
+          role: turn.role,
+          content: `[${formatUtc8(turn.created_at)}] ${turn.content}`,
+        });
       }
     }
   }

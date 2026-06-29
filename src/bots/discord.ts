@@ -7,6 +7,7 @@ import { storeSentMessage, getRecentSentMessages, deleteSentMessage, getSentMess
 import { chatWithAI, isAiEnabled } from '../ai/chat';
 import { listMemories, deleteMemory } from '../ai/memory';
 import { recordChannelMessage, getChannelMessageCount, getOldestStoredMessageId } from '../ai/summary';
+import { formatUtc8 } from '../ai/time';
 
 let client: Client | null = null;
 let targetChannel: TextChannel | null = null;
@@ -378,7 +379,7 @@ export function initDiscordAiChat(): boolean {
           if (refMsg) {
             const refAuthor = refMsg.member?.displayName || refMsg.author.username;
             const refContent = refMsg.content.slice(0, 2000);
-            contextMessage = `[${refAuthor}]: ${refContent}`;
+            contextMessage = `[${formatUtc8(refMsg.createdTimestamp)}] [${refAuthor}]: ${refContent}`;
             console.log(`[AI] 获取到引用消息 (${refAuthor}): ${refContent.slice(0, 80)}...`);
             const refImgs = extractImageUrls(refMsg);
             if (refImgs.length) imageUrls = [...imageUrls, ...refImgs].slice(0, 6);

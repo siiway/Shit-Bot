@@ -1,5 +1,6 @@
 import { getDatabase } from '../storage';
 import { getConfig } from '../config';
+import { formatUtc8 } from './time';
 
 export interface MemoryRow {
   id: number;
@@ -177,16 +178,20 @@ export function getRecentConversation(
   platform: string,
   username: string,
   limit: number
-): Array<{ role: 'user' | 'assistant'; content: string }> {
+): Array<{ role: 'user' | 'assistant'; content: string; created_at: number }> {
   if (limit <= 0) return [];
   ensureTables();
   const rows = getDatabase()
     .query(
-      `SELECT role, content FROM ai_conversations
+      `SELECT role, content, created_at FROM ai_conversations
        WHERE platform = ? AND username = ?
        ORDER BY created_at DESC, id DESC LIMIT ?`
     )
-    .all(platform, username, limit) as Array<{ role: 'user' | 'assistant'; content: string }>;
+    .all(platform, username, limit) as Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    created_at: number;
+  }>;
   return rows.reverse();
 }
 
@@ -215,7 +220,7 @@ function formatConv(rows: Array<{ role: string; content: string; created_at: num
   return rows
     .map((r) => {
       const who = r.role === 'user' ? '对方' : '你';
-      const when = new Date(r.created_at).toISOString().slice(0, 10);
+      const when = formatUtc8(r.created_at);
       return `- (${when}) ${who}: ${r.content.slice(0, 200)}`;
     })
     .join('\n');
