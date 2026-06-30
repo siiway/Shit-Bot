@@ -93,6 +93,76 @@ async function fetchWithTimeout(
   return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
+// 二进制限量读取：超过上限直接判失败返回 null（图片不能像文本那样截断——截断即损坏）
+async function readBodyCappedBytes(res: Response, maxBytes: number): Promise<Uint8Array | null> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const buf = new Uint8Array(await res.arrayBuffer());
+    return buf.byteLength > maxBytes ? null : buf;
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.byteLength;
+  }
+  return out;
+}
+
+/**
+ * 本机下载图片并转成 base64 data URI，避免把图片直链交给上游网关去下载。
+ * 上游网关(尤其中转到 Google AI Studio 这类)下载直链时常因 SSRF/IPv6/防盗链而失败，
+ * 被包成 HTTP 500 convert_request_failed，或干脆挂死直到超时；本机内联可彻底绕过这一步。
+ * 任何失败(不安全链接、非图片、超限、HTTP 错误、超时)都抛出，交调用方降级。
+ */
+export async function fetchImageAsDataUri(
+  url: string,
+  maxBytes: number
+): Promise<{ dataUri: string; bytes: number }> {
+  let current = url;
+  let res: Response | undefined;
+
+  for (let hop = 0; hop < 5; hop++) {
+    await assertSafeUrl(current);
+    res = await fetchWithTimeout(
+      current,
+      { method: 'GET', redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'image/*,*/*' } },
+      15000
+    );
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location');
+      res.body?.cancel().catch(() => {});
+      if (!loc) break;
+      current = new URL(loc, current).toString();
+      continue;
+    }
+    break;
+  }
+
+  if (!res) throw new Error('图片下载失败');
+  if (!res.ok) throw new Error(`图片下载失败 HTTP ${res.status}`);
+  const ctype = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!ctype.startsWith('image/')) {
+    res.body?.cancel().catch(() => {});
+    throw new Error(`目标不是图片 (content-type=${ctype || '未知'})`);
+  }
+  const bytes = await readBodyCappedBytes(res, maxBytes);
+  if (!bytes) throw new Error(`图片超过大小上限 (${Math.round(maxBytes / 1024)}KB)`);
+  return { dataUri: `data:${ctype};base64,${Buffer.from(bytes).toString('base64')}`, bytes: bytes.byteLength };
+}
+
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&',
   lt: '<',

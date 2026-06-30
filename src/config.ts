@@ -124,6 +124,9 @@ export function loadConfig(configPath?: string): AppConfig {
       allowedGuildIds: rawConfig.ai?.allowedGuildIds ?? [],
       maxToolIterations: clampInt(rawConfig.ai?.maxToolIterations, 8, 1, 30),
       reactions: rawConfig.ai?.reactions ?? true,
+      // 图片改由本机下载后以 base64 内联发给网关，故需限制单图与单次请求的字节量
+      maxImageBytes: clampInt(rawConfig.ai?.maxImageBytes, 6 * 1024 * 1024, 64 * 1024, 20 * 1024 * 1024),
+      maxTotalImageBytes: clampInt(rawConfig.ai?.maxTotalImageBytes, 12 * 1024 * 1024, 256 * 1024, 40 * 1024 * 1024),
       webSearch: {
         enabled: rawConfig.ai?.webSearch?.enabled ?? false,
         provider: rawConfig.ai?.webSearch?.provider || 'duckduckgo',

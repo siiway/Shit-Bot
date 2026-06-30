@@ -99,6 +99,10 @@ export interface AIConfig {
   allowedGuildIds?: string[];
   maxToolIterations?: number;
   reactions?: boolean;
+  // 单张图片内联(base64)时允许的原始字节上限；超过则跳过该图
+  maxImageBytes?: number;
+  // 单次请求所有内联图片的原始字节总预算；防止请求体过大被网关 400
+  maxTotalImageBytes?: number;
   webSearch?: AIWebSearchConfig;
   memory?: AIMemoryConfig;
   summary?: AISummaryConfig;

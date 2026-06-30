@@ -1,5 +1,5 @@
 import { getConfig } from '../config';
-import { webSearch, fetchUrl, assertSafeUrl } from './websearch';
+import { webSearch, fetchUrl } from './websearch';
 import { recallMemories, saveMemory, updateMemory, deleteMemory } from './memory';
 import { getRecentChannelMessages, formatForSummary } from './summary';
 
@@ -9,7 +9,7 @@ export interface ToolContext {
   channelId?: string;
   excludeMessageId?: string;
   backfill?: (targetTotal: number) => Promise<void>;
-  addImages?: (urls: string[]) => number;
+  addImages?: (urls: string[]) => Promise<number>;
 }
 
 export interface OpenAITool {
@@ -227,19 +227,11 @@ export async function executeTool(
         const candidates = list
           .filter((u): u is string => typeof u === 'string' && /^https?:\/\//i.test(u))
           .slice(0, 6);
-        const valid: string[] = [];
-        for (const u of candidates) {
-          try {
-            await assertSafeUrl(u);
-            valid.push(u);
-          } catch {
-            // 跳过内网/私网/元数据等不安全链接
-          }
-        }
-        if (valid.length === 0) return '没有有效的图片链接(需 http(s) 公网直链)。';
-        const added = ctx.addImages(valid);
+        if (candidates.length === 0) return '没有有效的图片链接(需 http(s) 公网直链)。';
+        // 由 addImages 统一负责：SSRF 校验 + 本机下载 + base64 内联，绝不把直链交给网关去取
+        const added = await ctx.addImages(candidates);
         if (added <= 0) {
-          return '这些图片可能已在上下文中、或本轮已达可加载图片数量上限。请基于已有的图片与信息作答，不要臆测未加载图片的内容。';
+          return '这些图片未能加载到上下文（可能是链接失效/防盗链下载失败、内网地址被拒、已在上下文中、或已达数量/体积上限）。请基于已有的图片与信息作答，不要臆测未加载图片的内容。';
         }
         return `已加载 ${added} 张图片到上下文，请查看后回答。`;
       }

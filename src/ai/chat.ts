@@ -3,6 +3,7 @@ import { buildTools, executeTool, OpenAITool, ToolContext } from './tools';
 import { buildProfile, logConversation, getRecentConversation } from './memory';
 import { parseReplyJson, salvageReply, ReplyPayload } from './reactions';
 import { formatUtc8, nowUtc8 } from './time';
+import { fetchImageAsDataUri } from './websearch';
 
 interface ToolCall {
   id: string;
@@ -69,8 +70,9 @@ function buildMemorySystemMessage(
   );
 }
 
-// 上游网关"拉取/下载图片失败"类错误的特征。这类错误是永久性的（图片直链对网关侧不可达，
-// 常被包装成 HTTP 500 convert_request_failed），重试无用，正确处理是去掉图片改用纯文本重试。
+// 上游网关"拉取/下载图片失败"类错误的特征。图片现已由本机下载后 base64 内联（见 loadImageDataUri），
+// 网关无需联网取图，正常情况下不会再出现这类错误；保留它仅作兜底：万一仍命中(如内联失败漏网、
+// 或网关对 data URI 另有限制)，按永久性处理——重试无用，正确做法是去掉图片改用纯文本重试。
 function isImageFetchError(err: { status?: number; body?: string; message?: string }): boolean {
   const s = `${err.body || ''} ${err.message || ''}`.toLowerCase();
   return /get file data|file data from|download file|failed to download|convert_request_failed/.test(s);
@@ -172,11 +174,41 @@ function messagesHaveImages(messages: ChatMessage[]): boolean {
 function stripImageParts(messages: ChatMessage[]): void {
   for (const m of messages) {
     if (Array.isArray(m.content)) {
-      m.content = m.content
-        .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-        .map((p) => p.text)
-        .join('\n');
+      let imgCount = 0;
+      const texts: string[] = [];
+      for (const p of m.content) {
+        if (p.type === 'text') texts.push(p.text);
+        else if (p.type === 'image_url') imgCount++;
+      }
+      let joined = texts.join('\n');
+      // 关键：去图后必须留痕，否则模型看不到任何图片线索，会理直气壮地回"你没发图"误导用户
+      if (imgCount > 0) {
+        joined += `\n（系统提示：此处原有 ${imgCount} 张图片，但无法处理、已移除；请勿声称用户没有发图，可如实说明你这边暂时看不到图片，并请对方换种方式提供。）`;
+      }
+      m.content = joined;
     }
+  }
+}
+
+interface ImageBudget {
+  remainingBytes: number;
+}
+
+// 本机下载单张图片并转成 base64 data URI；受单图上限与本次请求剩余总预算双重约束。失败/超限返回 null。
+async function loadImageDataUri(
+  url: string,
+  budget: ImageBudget,
+  perImageMax: number
+): Promise<string | null> {
+  const cap = Math.min(perImageMax, budget.remainingBytes);
+  if (cap <= 0) return null;
+  try {
+    const { dataUri, bytes } = await fetchImageAsDataUri(url, cap);
+    budget.remainingBytes -= bytes;
+    return dataUri;
+  } catch (e) {
+    console.warn(`[AI] 图片内联失败，跳过 (${url.slice(0, 80)}): ${(e as Error).message}`);
+    return null;
   }
 }
 
@@ -289,11 +321,37 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
 
   const effMsg = bareMention ? '（我直接 @ 了你，没有具体问题，麻烦你看看情况自然地回应一下。）' : userMessage;
   const userText = `[${displayName}]: ${effMsg}`;
-  const images = (ctx?.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 6);
-  if (images.length > 0) {
-    const parts: ContentPart[] = [{ type: 'text', text: userText }];
-    for (const url of images) parts.push({ type: 'image_url', image_url: { url } });
-    messages.push({ role: 'user', content: parts });
+  const imageUrls = (ctx?.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 6);
+
+  const MAX_TOTAL_IMAGES = 6;
+  const perImageMax = cfg.maxImageBytes ?? 6 * 1024 * 1024;
+  // 整条请求所有内联图片共享一份字节预算，初始图与 read_image 后续加载都从这里扣
+  const imageBudget: ImageBudget = { remainingBytes: cfg.maxTotalImageBytes ?? 12 * 1024 * 1024 };
+  const loadedImageUrls = new Set<string>(imageUrls);
+  let imagesLoaded = 0;
+
+  if (imageUrls.length > 0) {
+    const imgParts: ContentPart[] = [];
+    for (const url of imageUrls) {
+      if (imagesLoaded >= MAX_TOTAL_IMAGES) break;
+      const dataUri = await loadImageDataUri(url, imageBudget, perImageMax);
+      if (dataUri) {
+        imgParts.push({ type: 'image_url', image_url: { url: dataUri } });
+        imagesLoaded++;
+      }
+    }
+    if (imgParts.length > 0) {
+      messages.push({ role: 'user', content: [{ type: 'text', text: userText }, ...imgParts] });
+    } else {
+      // 一张都没下成：用纯文本并明确告知"有图但加载不了"，杜绝模型反过来说用户没发图
+      console.warn(`[AI] 用户发送的 ${imageUrls.length} 张图片全部内联失败，降级为纯文本`);
+      messages.push({
+        role: 'user',
+        content:
+          userText +
+          `\n（系统提示：用户随消息发送了 ${imageUrls.length} 张图片，但系统未能加载它们；请勿声称用户没有发图，可如实说明你这边暂时看不到图片，并请对方换种方式提供。）`,
+      });
+    }
   } else {
     messages.push({ role: 'user', content: userText });
   }
@@ -302,7 +360,7 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
     try {
       const logText = bareMention
         ? '[直接@机器人]'
-        : userMessage || (images.length ? '[发送了图片]' : '');
+        : userMessage || (imageUrls.length ? '[发送了图片]' : '');
       logConversation(platform, username, 'user', logText);
     } catch (e) {
       console.warn('[AI] 记录用户消息到记忆失败(忽略):', (e as Error).message);
@@ -312,11 +370,9 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
   const tools = buildTools();
   const maxIterations = Math.max(
     1,
-    images.length ? Math.min(cfg.maxToolIterations ?? 5, 3) : cfg.maxToolIterations ?? 5
+    imageUrls.length ? Math.min(cfg.maxToolIterations ?? 5, 3) : cfg.maxToolIterations ?? 5
   );
-  const MAX_TOTAL_IMAGES = 6;
-  const loadedImageUrls = new Set<string>(images);
-  let imagesLoaded = images.length;
+  // pendingImages 存的是已内联好的 base64 data URI（不是原始直链）
   const pendingImages: string[] = [];
   const toolCtx: ToolContext = {
     platform,
@@ -324,16 +380,18 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
     channelId: ctx?.channelId,
     excludeMessageId: ctx?.messageId,
     backfill: ctx?.backfillChannel,
-    addImages: (urls): number => {
+    // read_image 走这里：本机下载并内联，绝不把直链交给网关；返回真正成功加载的张数
+    addImages: async (urls): Promise<number> => {
       let added = 0;
       for (const u of urls) {
         if (imagesLoaded >= MAX_TOTAL_IMAGES) break;
-        if (!loadedImageUrls.has(u)) {
-          loadedImageUrls.add(u);
-          pendingImages.push(u);
-          imagesLoaded++;
-          added++;
-        }
+        if (loadedImageUrls.has(u)) continue;
+        loadedImageUrls.add(u);
+        const dataUri = await loadImageDataUri(u, imageBudget, perImageMax);
+        if (!dataUri) continue;
+        pendingImages.push(dataUri);
+        imagesLoaded++;
+        added++;
       }
       return added;
     },
@@ -443,8 +501,9 @@ export async function chatWithAI(userMessage: string, ctx?: ChatContext): Promis
           const parts: ContentPart[] = [
             { type: 'text', text: '（read_image 工具加载的图片，请查看后回答）' },
           ];
-          for (const url of pendingImages.splice(0)) {
-            parts.push({ type: 'image_url', image_url: { url } });
+          // pendingImages 已是内联好的 base64 data URI
+          for (const dataUri of pendingImages.splice(0)) {
+            parts.push({ type: 'image_url', image_url: { url: dataUri } });
           }
           messages.push({ role: 'user', content: parts });
         }
