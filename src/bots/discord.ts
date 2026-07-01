@@ -361,6 +361,11 @@ export function initDiscordAiChat(): boolean {
       return;
     }
 
+    if (getConfig().ai.ignoreEveryoneMention && message.mentions.everyone) {
+      console.log(`[AI] 消息包含 @everyone，跳过回复`);
+      return;
+    }
+
     const content = message.content
       .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
       .trim();
